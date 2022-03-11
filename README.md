@@ -1,16 +1,18 @@
-# nx-cache-redis
-redis cache for nx
+# nx-db-pdo
+
+pdo for nx
 
 
-> composer require urn2/nx-cache-redis
+> composer require urn2/nx-db-pdo
 
 ```
-cache/redis'=>[
-    'default'=>[
-        'host'=>'127.0.0.1',
-        'port'=>6379,
-        'timeout'=>0.0,
-        'select'=>0
+'db/pdo'=>[
+    'default' => [
+        'dsn' => 'mysql:dbname=db_name;host=host_url;charset=utf8mb4',
+        'username' => 'db_user',
+        'password' => 'db_password',
+        'options' => [
+        ],
     ],
 ]
 ```

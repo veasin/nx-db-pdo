@@ -1,6 +1,6 @@
 {
-  "name": "urn2/nx-cache-redis",
-  "description": "redis cache for nx",
+  "name": "urn2/nx-db-pdo",
+  "description": "pdo for nx",
   "homepage": "https://github.com/urn2/nx",
   "type": "framework",
   "authors": [
@@ -12,7 +12,7 @@
   ],
   "require": {
     "php": ">=8.1",
-    "ext-redis": "*",
+    "ext-pdo": "*",
     "urn2/nx": ">=1.2"
   },
   "minimum-stability": "stable",
