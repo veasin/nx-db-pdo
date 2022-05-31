@@ -489,53 +489,53 @@ class sql implements \ArrayAccess{
 	const JOIN_NATURAL ='NATURAL';
 
 	//protected $table =[];
-	protected $where =[];
+	protected array $where =[];
 	protected $select =null;
 	protected $limit =null;
 	protected $sort =null;
-	protected $join =[];
+	protected array $join =[];
 	protected $group =null;
-	protected $having =[];
+	protected array $having =[];
 	/**
 	 * 操作
 	 * @var string
 	 */
-	protected $action ='';
+	protected string $action ='';
 	/**
 	 * 操作配置参数
 	 * @var array
 	 */
-	protected $options =[];
+	protected array $options =[];
 	/**
 	 * 创建或更新内容
 	 * @var array
 	 */
-	protected $set =[];//
+	protected array $set =[];//
 	/**
 	 * 表名 单表逻辑
 	 * @var string
 	 */
-	protected $table ='';
+	protected string $table ='';
 	/**
 	 * 表名 别名
 	 * @var string
 	 */
-	protected $tableAS ='';
+	protected string $tableAS ='';
 	/**
 	 * 当前表的主键名
 	 * @var string
 	 */
-	protected $primary ='id';
+	protected string $primary ='id';
 	/**
-	 * @var \nx\helpers\db\pdo
+	 * @var \nx\helpers\db\pdo|null
 	 */
-	protected $db =null;
+	protected ?pdo $db =null;
 	/**
 	 * 执行参数
 	 * @var array
 	 */
-	public $params =[];
-	public $collectParams =true;
+	public array $params =[];
+	public bool $collectParams =true;
 	/**
 	 * 是否只返回第一条数据
 	 * @var bool
@@ -812,7 +812,7 @@ class sql implements \ArrayAccess{
 	}
 	protected function buildLimit($limit):string{
 		if(empty($limit)) return '';
-		list($rows, $offset) =$limit ?? ['', 0];
+		[$rows, $offset] =$limit ?? ['', 0];
 		if(empty($rows)) return '';
 		return 0 === $offset ?" LIMIT {$rows}" :" LIMIT {$offset}, {$rows}";
 	}
@@ -868,7 +868,7 @@ class sql implements \ArrayAccess{
 				$priority =($this->options['priority'] ??false) ?' '.strtoupper($this->options['priority']) :''; //LOW_PRIORITY | DELAYED | HIGH_PRIORITY
 				$ignore =($this->options['ignore'] ??false) ?' IGNORE' :''; //IGNORE
 				//$set =[]; //ON DUPLICATE KEY UPDATE col_name=expr, ...
-				list($cols, $prepares, $this->params) =$this->buildInsertValue($this->set);
+				[$cols, $prepares, $this->params] =$this->buildInsertValue($this->set);
 				$table =$this->getFormatName(false);
 				return "INSERT{$priority}{$ignore} INTO {$table} ({$cols}) VALUES ($prepares)";
 			case 'update':
@@ -967,7 +967,7 @@ class sql implements \ArrayAccess{
 				$hasJoin =count($this->join)>0;
 				$select =$this->buildSelect(!$hasJoin);
 				if($hasJoin){
-					list($join, $joinSelect) =$this->buildJoin($this->join);
+					[$join, $joinSelect] =$this->buildJoin($this->join);
 					$select .=(''===$joinSelect) ?'' :($select?', ':'').$joinSelect;
 				} else $join='';
 				$where =$this->buildWhere($this->where);
@@ -986,7 +986,11 @@ class sql implements \ArrayAccess{
 				return 'DO 1';
 		}
 	}
-	protected function buildJoin($joins=[]){
+	/**
+	 * @param array $joins
+	 * @return array[string, string]
+	 */
+	protected function buildJoin(array $joins=[]):array{
 		$_joins =[];
 		$_select =[];
 		foreach($joins as $join){
@@ -1001,7 +1005,7 @@ class sql implements \ArrayAccess{
 				$on[] ="{$j} = $t";
 			}
 			$keyword =in_array('STRAIGHT', $join[2]) ?'STRAIGHT_JOIN' :'JOIN';
-			$_on =implode(', ', $on);
+			$_on =implode(' AND ', $on);
 			$_joins[]="{$options} {$keyword} {$table} ON ({$_on})";
 
 			$select =$join[0]->buildSelect(false);

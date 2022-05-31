@@ -25,5 +25,8 @@
         "src/helpers/"
       ]
     }
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5"
   }
 }
