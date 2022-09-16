@@ -8,6 +8,7 @@
 declare(strict_types=1);
 namespace nx\helpers\db;
 
+use nx\app;
 use nx\helpers\db\pdo\result;
 
 class pdo{
@@ -16,18 +17,18 @@ class pdo{
 		\PDO::ATTR_STRINGIFY_FETCHES=>false,
 		\PDO::ATTR_EMULATE_PREPARES=>false,
 	];
-	private int $timeout=0;//超时
+	private int $timeout;//超时
 	/**
 	 * @var \PDO|null
 	 */
 	public ?\PDO $link=null;
-	private array $setup=[];
+	private array $setup;
 	/**
 	 * @var callable
 	 */
 	private $_log=null;
 	public function __construct($setup=[]){
-		if(!is_null(\nx\app::$instance)) $this->_log=[\nx\app::$instance, 'log'];
+		if(!is_null(app::$instance)) $this->_log=[app::$instance, 'log'];
 		$this->setup=$setup ?? [];
 		$this->timeout=$this->setup['timeout'] ?? 0;
 		$this->setup['options']=($this->setup['options'] ?? []) + $this->_nx_db_pdo_options;
@@ -39,29 +40,29 @@ class pdo{
 		$now=time();
 		if(null === $this->link || ($this->timeout > 0 && $this->timeout < $now)){
 			$this->link=new \PDO($this->setup['dsn'], $this->setup['username'], $this->setup['password'], $this->setup['options']);
-			$this->timeout=($this->setup['timeout'] ?? 0 > 0) ?$now + $this->setup['timeout'] :0;
+			$this->timeout=(($this->setup['timeout'] ?? 0) > 0) ?$now + $this->setup['timeout'] :0;
 		}
 		return $this->link;
 	}
-	public function setLog(callable $logger){
+	public function setLog(callable $logger): void{
 		$this->_log=$logger;
 	}
 	/**
 	 * @param string $template
 	 * @param array  $data
 	 */
-	private function log(string $template, array $data=[]){
+	private function log(string $template, array $data=[]): void{
 		if(null !== $this->_log){
 			call_user_func($this->_log, $template);
 			count($data) && call_user_func($this->_log, $data);
 		}
 	}
-	public function logFormatSQL(string $prepare, array $params=null, string $action=''){
+	public function logFormatSQL(string $prepare, array $params=null, string $action=''): void{
 		$params=$params ?? [];
 		$sql=str_replace('?', '%s', $prepare);
 		$prefix='sql: ';
 		$map=function($value){
-			return gettype($value) === 'integer' ?$value :"\"{$value}\"";
+			return gettype($value) === 'integer' ?$value :"\"$value\"";
 		};
 		if('insert' === $action){
 			$_first=current($params);
@@ -75,7 +76,7 @@ class pdo{
 		$this->log($prefix.sprintf($sql, ...array_map($map, $params)));
 	}
 	/**
-	 * @return \nx\helpers\db\pdo\result|null
+	 * @return result|null
 	 */
 	private function failed():?result{
 		$this->log('sql error: %s %s %s', $this->link->errorInfo());
@@ -86,12 +87,13 @@ class pdo{
 	 * ->insert('INSERT INTO cds (`interpret`, `title`) VALUES (?, ?)', ['vea', 'new cd']);
 	 * @param string     $sql
 	 * @param array|null $params
-	 * @return \nx\helpers\db\pdo\result
+	 * @return result
 	 */
 	public function insert(string $sql, array $params=null):pdo\result{
 		$this->logFormatSQL($sql, $params, 'insert');
 		$db=$this->db();
 		$ok=false;
+        $sth = null;
 		if(0 === count($params)){
 			$ok=$db->exec($sql);
 		}else{
@@ -113,7 +115,7 @@ class pdo{
 	 * ->select('SELECT `cds`.* FROM `cds` WHERE `cds`.`id` = ?', [13])
 	 * @param string     $sql
 	 * @param array|null $params
-	 * @return \nx\helpers\db\pdo\result
+	 * @return result
 	 */
 	public function select(string $sql, array $params=null):pdo\result{
 		$this->logFormatSQL($sql, $params);
@@ -129,7 +131,7 @@ class pdo{
 	 * ->update('UPDATE `cds` SET `interpret` =? WHERE `cds`.`id` = ?', ['vea', 14])
 	 * @param string     $sql
 	 * @param array|null $params
-	 * @return \nx\helpers\db\pdo\result
+	 * @return result
 	 */
 	public function execute(string $sql, array $params=null):pdo\result{
 		$this->logFormatSQL($sql, $params);
@@ -160,9 +162,9 @@ class pdo{
 	 * 返回table对象
 	 * @param string $tableName
 	 * @param string $primary
-	 * @return \nx\helpers\db\sql
+	 * @return sql
 	 */
-	public function from(string $tableName, string $primary='id'):\nx\helpers\db\sql{
+	public function from(string $tableName, string $primary='id'): sql{
 		return new sql($tableName, $primary, $this);
 	}
 }
