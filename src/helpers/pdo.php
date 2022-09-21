@@ -96,6 +96,7 @@ class pdo{
         $sth = null;
 		if(0 === count($params)){
 			$ok=$db->exec($sql);
+            if(false !==$ok) $ok =true;
 		}else{
 			$sth=$db->prepare($sql);
 			if(false === $sth) return $this->failed();
