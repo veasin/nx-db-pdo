@@ -12,8 +12,10 @@ trait pdo{
 	 */
 	public function db(string $name='default'):?\nx\helpers\db\pdo{
 		if(!array_key_exists($name, $this->db_pdo)){
-			$config=($this->setup['db/pdo'] ?? [])[$name] ?? throw new Error("db[$name] config error.");
+			$config=($this['db/pdo'] ?? [])[$name] ?? throw new Error("db[$name] config error.");
 			$this->db_pdo[$name]=new \nx\helpers\db\pdo($config);
+			if(method_exists($this,'runtime')) $this->db_pdo[$name]->setLog([$this, 'runtime']);
+			elseif (method_exists($this, 'log')) $this->db_pdo[$name]->setLog([$this, 'log']);
 		}
 		return $this->db_pdo[$name];
 	}

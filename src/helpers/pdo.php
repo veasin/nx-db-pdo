@@ -8,7 +8,6 @@
 declare(strict_types=1);
 namespace nx\helpers\db;
 
-use nx\app;
 use nx\helpers\db\pdo\result;
 
 class pdo{
@@ -28,7 +27,6 @@ class pdo{
 	 */
 	private $_log=null;
 	public function __construct($setup=[]){
-		if(!is_null(app::$instance)) $this->_log=[app::$instance, 'log'];
 		$this->setup=$setup ?? [];
 		$this->timeout=$this->setup['timeout'] ?? 0;
 		$this->setup['options']=($this->setup['options'] ?? []) + $this->_nx_db_pdo_options;
@@ -60,7 +58,7 @@ class pdo{
 	public function logFormatSQL(string $prepare, array $params=null, string $action=''): void{
 		$params=$params ?? [];
 		$sql=str_replace('?', '%s', $prepare);
-		$prefix='sql: ';
+		$prefix=' sql: ';
 		$map=function($value){
 			return gettype($value) === 'integer' ?$value :"\"$value\"";
 		};

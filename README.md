@@ -3,7 +3,7 @@
 pdo for nx
 
 
-> composer require urn2/nx-db-pdo
+> composer require veasin/nx-db-pdo
 
 ```
 'db/pdo'=>[
