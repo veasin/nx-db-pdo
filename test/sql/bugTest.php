@@ -111,4 +111,36 @@ class bugTest extends TestCase{
 
 
 	}
+	public function testBug7(){
+		$db =new \nx\helpers\db\pdo();
+
+		$serviceTable=$db->from('service');
+
+
+		$table =$db->from('corp_service');
+
+		$conditions['corp_id']=1;
+		$conditions['deleted_at']=0;
+		$table->where($conditions);
+
+		$table->join($serviceTable, ['id'=>'service_id', 'deleted_at'=>$table(0)],['INNER']);
+		$table->group($serviceTable['id']);
+
+		$table->select($table::COUNT('*')->as('COUNT'));
+
+		//$this->assertEquals('SELECT COUNT(*) `COUNT`, `service`.* FROM `corp_service` INNER JOIN `service` ON (`service`.`id` = `corp_service`.`service_id` AND `service`.`deleted_at` = ?) WHERE `corp_service`.`corp_id` = ? AND `corp_service`.`deleted_at` = ? GROUP BY `service`.`id`', (string)$table);
+		var_dump((string)$table);
+
+		$table->sort('id', 'DESC');
+		$table->page(1, 10);
+		$table->select(['corp_id','state_enable']);
+		$table->group(null);
+
+		$serviceTable->select(['*']);
+
+		//$this->assertEquals('SELECT `corp_service`.`corp_id`, `corp_service`.`state_enable`, `service`.* FROM `corp_service` INNER JOIN `service` ON (`service`.`id` = `corp_service`.`service_id` AND `service`.`deleted_at` = ?) WHERE `corp_service`.`corp_id` = ? AND `corp_service`.`deleted_at` = ? GROUP BY `service`.`id` ORDER BY `corp_service`.`id` DESC LIMIT 10', (string)$table);
+
+		var_dump((string)$table);
+
+	}
 }

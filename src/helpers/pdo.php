@@ -51,14 +51,14 @@ class pdo{
 	 */
 	private function log(string $template, array $data=[]): void{
 		if(null !== $this->_log){
-			call_user_func($this->_log, $template);
+			call_user_func($this->_log, $template , 'sql');
 			count($data) && call_user_func($this->_log, $data);
 		}
 	}
 	public function logFormatSQL(string $prepare, array $params=null, string $action=''): void{
 		$params=$params ?? [];
 		$sql=str_replace('?', '%s', $prepare);
-		$prefix=' sql: ';
+		$prefix='  ';
 		$map=function($value){
 			return gettype($value) === 'integer' ?$value :"\"$value\"";
 		};

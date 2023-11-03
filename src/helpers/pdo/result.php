@@ -52,6 +52,7 @@ class result{
 		else return $this->fetchAll($this->pdo::FETCH_CLASS, $className, $args);
 	}
 	/**
+	 * 获取全部查询结果 后，再对全部数据进行一次回调，根据参数不同进行不同返回
 	 * DATA:[[key, val, oth],[key, val, oth]...]
 	 * ARGS:(key, val)=>[key=>val],
 	 *      (key, fun)=>[key=>fun(val)]
@@ -81,11 +82,23 @@ class result{
 		};
 		return $this->fetchAllMap($callback, $this->pdo::FETCH_ASSOC);
 	}
+	/**
+	 * 获取全部查询结果 后，再对全部数据进行一次回调
+	 * @param $callback
+	 * @param ...$fetch_styles
+	 * @return mixed
+	 */
 	public function fetchAllMap($callback, ...$fetch_styles){
 		if(0 === count($fetch_styles)) $fetch_styles[]=$this->pdo::FETCH_ASSOC;
 		$r=$this->fetchAll(...$fetch_styles);
 		return call_user_func($callback, $r);
 	}
+	/**
+	 * 获取全部查询结果 后，再针对每条数据进行回调处理
+	 * @param $callback
+	 * @param ...$fetch_styles
+	 * @return array|null
+	 */
 	public function fetchMap($callback, ...$fetch_styles):?array{
 		if(0 === count($fetch_styles)) $fetch_styles[]=$this->pdo::FETCH_ASSOC;
 		$r=$this->fetchAll(...$fetch_styles);
@@ -97,12 +110,22 @@ class result{
 			return $rr;
 		}else return $r;
 	}
+	/**
+	 * 获取一条查询结果
+	 * @param ...$args
+	 * @return array|null
+	 */
 	public function fetch(...$args):?array{
 		if(false === $this->result) return null;else{
 			$r=$this->sth->fetch(...$args);
 			return false !== $r ?$r :null;
 		}
 	}
+	/**
+	 * 获取全部查询结果
+	 * @param ...$args
+	 * @return array|null
+	 */
 	public function fetchAll(...$args):?array{
 		if(false === $this->result) return null;else{
 			$r=$this->sth->fetchAll(...$args);
