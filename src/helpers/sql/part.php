@@ -8,8 +8,11 @@
 declare(strict_types=1);
 namespace nx\helpers\db\sql;
 
+use nx\helpers\db\sql;
+
 /**
  * Class part
+ *
  * @package nx\helpers\db\sql
  *
  * 12.2
@@ -96,6 +99,7 @@ namespace nx\helpers\db\sql;
  *	IF()		If/else construct
  *	IFNULL()    Null if/else construct
  *	NULLIF()	Return NULL if expr1 = expr2
+ * @method static part IF($expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
  * @method static part IFIF($expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
  * @method static part IFNULL($expr2) 假如expr1 不为 NULL，则 IFNULL() 的返回值为 expr1; 否则其返回值为 expr2。IFNULL()的返回值是数字或是字符串，具体情况取决于其所使用的语境
  * @method static part NULLIF($expr2) 如果expr1 = expr2  成立，那么返回值为NULL，否则返回值为 expr1。这和CASE WHEN expr1 = expr2 THEN NULL ELSE expr1 END相同
@@ -451,58 +455,50 @@ class part{
 	 * 类型
 	 * @var string [value|field|function]
 	 */
-	public $type='value';
+	public string $type='value';
 	/**
 	 * 部分来源 用于类型为field的时候
-	 * @var \nx\helpers\db\sql
 	 */
-	protected $from=null;
+	protected ?sql $from=null;
 	/**
 	 * 作为参数收集来源记录，默认为from
-	 * @var \nx\helpers\db\sql
 	 */
-	protected $collect =null;
+	protected ?sql $collect =null;
 	/**
 	 * 需要处理的值，应该为string
-	 * @var null
 	 */
-	public $value=null;
+	public mixed $value=null;
 	/**
 	 * 别名，只考虑最外层别名
-	 * @var null
 	 */
-	public $as =null;
+	public ?string $as =null;
 	/**
 	 * 当类型为function的时候的调用参数
-	 * @var array
 	 */
-	protected $arguments=[];
+	protected array $arguments=[];
 	/**
-	 * @var part array
+	 * @var part[]
 	 */
-	protected $parts =[];
-	public function __construct($value, string $type='value', \nx\helpers\db\sql $from=null){
+	protected array $parts =[];
+	public function __construct($value, string $type='value', sql $from=null){
 		$this->value =$value;
 		$this->type =$type;
 		$this->from =$from;
 	}
 	/**
-	 * @param \nx\helpers\db\sql $from
+	 * @param sql $from
 	 * @return $this
 	 */
-	public function collectFrom(\nx\helpers\db\sql $from){
+	public function collectFrom(sql $from): static{
 		$this->collect =$from;
 		return $this;
 	}
-	public function arguments(...$arguments):part{
-		$this->arguments =[];
-		foreach($arguments as $argument){
-			$this->arguments[] =$argument instanceof part ?$argument :new part($argument, 'value', $this->from);
-		}
+	public function arguments(...$arguments):static{
+		$this->arguments =array_map(fn($argument)=>$argument instanceof part ?$argument :new static($argument, 'value', $this->from), $arguments);
 		return $this;
 	}
-	public function __call($name, $arguments):part{
-		$part =new part($name, 'function', $this->from);
+	public function __call($name, $arguments):static{
+		$part =new static($name, 'function', $this->from);
 		return $part->arguments($this,...$arguments);
 	}
 	/**
@@ -510,15 +506,15 @@ class part{
 	 * @param $arguments
 	 * @return part
 	 */
-	public static function __callStatic($name, $arguments):part{
+	public static function __callStatic($name, $arguments):static{
 		return (new static($name, 'function'))->arguments(...$arguments);
 	}
 	/**
 	 * 设置别名
 	 * @param string $name
-	 * @return \nx\helpers\db\sql\part
+	 * @return part
 	 */
-	public function as(string $name):part{
+	public function as(string $name):static{
 		$this->as =$name;
 		return $this;
 	}
@@ -532,7 +528,7 @@ class part{
 		$r ='';
 		switch($this->type){
 			case 'value':
-				$r =\nx\helpers\db\sql::formatValue($this->value, $this->from);
+				$r =sql::formatValue($this->value, $this->from);
 				break;
 			case 'field':
 				//$table =(string)$this->from;
@@ -546,7 +542,7 @@ class part{
 					case 'or':
 					case 'xor':
 						$opt =strtoupper($fun);
-						$r ="({$this->arguments[0]} {$opt} {$this->arguments[1]})";
+						$r ="({$this->arguments[0]} $opt {$this->arguments[1]})";
 						break;
 					case 'not':
 						$r ="NOT {$this->arguments[1]}";
@@ -558,7 +554,7 @@ class part{
 						$opt =$this->arguments[2] ?? '=';
 						if($opt instanceof part) $opt =$opt->value;
 						$opt =strtoupper($opt);
-						$r ="{$this->arguments[0]} {$opt} {$this->arguments[1]}";
+						$r ="{$this->arguments[0]} $opt {$this->arguments[1]}";
 						break;
 					case 'between':
 						$opt =$this->arguments[3] ?? false;
@@ -570,23 +566,23 @@ class part{
 						$in =$this->arguments;
 						array_shift($in);
 						$in =implode(',', $in);
-						$r ="{$this->arguments[0]} IN ({$in})";
+						$r ="{$this->arguments[0]} IN ($in)";
 						break;
 					case 'notIn':
 						$in =$this->arguments;
 						array_shift($in);
 						$in =implode(',', $in);
-						$r ="{$this->arguments[0]} NOT IN ({$in})";
+						$r ="{$this->arguments[0]} NOT IN ($in)";
 						break;
 					case 'TRIM':
 						$side =strtoupper(($this->arguments[2] ??null) ?$this->arguments[2]->value :'both');
 						$rem =($this->arguments[1] ?? null) ?"{$this->arguments[1]} " :'';
-						$r ="TRIM({$side} {$rem}FROM {$this->arguments[0]})";
+						$r ="TRIM($side {$rem}FROM {$this->arguments[0]})";
 						break;
 					case 'WEIGHT_STRING':
 						$type =strtoupper(($this->arguments[2] ??null) ?$this->arguments[2]->value :'char');
 						$n =($this->arguments[1] ?? null) ?($this->arguments[1]->value ?? null) ?$this->arguments[1] :'' :'';
-						$r ="WEIGHT_STRING({$this->arguments[0]} AS {$type}({$n}))";
+						$r ="WEIGHT_STRING({$this->arguments[0]} AS $type($n))";
 						break;
 					case "AVG":
 					case "COUNT":
@@ -595,18 +591,18 @@ class part{
 					case "SUM":
 						$fun =strtoupper($fun);
 						$distinct =(!empty($this->arguments[1]) && $this->arguments[1]->value) ?'DISTINCT ':'';
-						$r ="{$fun}({$distinct}{$this->arguments[0]})";
+						$r ="$fun($distinct{$this->arguments[0]})";
 						break;
 					case "IFIF":
 						$fun ="IF";
 					default:
 						$fun =strtoupper($fun);
 						$args =implode(', ',$this->arguments);
-						$r ="{$fun}({$args})";
+						$r ="$fun($args)";
 						break;
 				}
 
 		}
-		return $r.($this->as ?" `{$this->as}`":'');
+		return $r.($this->as ?" `$this->as`":'');
 	}
 }

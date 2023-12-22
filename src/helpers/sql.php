@@ -8,9 +8,13 @@
 declare(strict_types=1);
 namespace nx\helpers\db;
 
+use nx\helpers\db\pdo\result;
+use nx\helpers\db\sql\part;
+
 /**
  * Class sql 单表模式，移除多表逻辑
  * MySQL 8.0 https://dev.mysql.com/doc/refman/8.0/en/
+ *
  * @package nx\helpers\db
  *
  * 12.2
@@ -97,7 +101,8 @@ namespace nx\helpers\db;
  *	IF()		If/else construct
  *	IFNULL()    Null if/else construct
  *	NULLIF()	Return NULL if expr1 = expr2
- * @method static sql\part IFIF($expr1,$expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
+ * @method static sql\part IF($expr1,$expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
+ * @method static sql\part IFIF($expr1,$expr2,$expr3) ? 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
  * @method static sql\part IFNULL($expr1,$expr2) 假如expr1 不为 NULL，则 IFNULL() 的返回值为 expr1; 否则其返回值为 expr2。IFNULL()的返回值是数字或是字符串，具体情况取决于其所使用的语境
  * @method static sql\part NULLIF($expr1,$expr2) 如果expr1 = expr2  成立，那么返回值为NULL，否则返回值为 expr1。这和CASE WHEN expr1 = expr2 THEN NULL ELSE expr1 END相同
  *
@@ -490,11 +495,11 @@ class sql implements \ArrayAccess{
 
 	//protected $table =[];
 	protected array $where =[];
-	protected $select =null;
-	protected $limit =null;
-	protected $sort =null;
+	protected mixed $select =null;
+	protected ?array $limit =null;
+	protected ?array $sort =null;
 	protected array $join =[];
-	protected $group =null;
+	protected ?array $group =null;
 	protected array $having =[];
 	/**
 	 * 操作
@@ -527,7 +532,7 @@ class sql implements \ArrayAccess{
 	 */
 	protected string $primary ='id';
 	/**
-	 * @var \nx\helpers\db\pdo|null
+	 * @var pdo|null
 	 */
 	protected ?pdo $db =null;
 	/**
@@ -540,12 +545,13 @@ class sql implements \ArrayAccess{
 	 * 是否只返回第一条数据
 	 * @var bool
 	 */
-	private $first =false;
+	private bool $first =false;
 	/**
 	 * sql constructor.
-	 * @param string                  $tableName
-	 * @param string                  $primary
-	 * @param \nx\helpers\db\pdo|null $db
+	 *
+	 * @param string   $tableName
+	 * @param string   $primary
+	 * @param pdo|null $db
 	 */
 	public function __construct(string $tableName, string $primary='id', pdo $db=null){
 		$n =explode(' ', $tableName, 2);
@@ -556,47 +562,47 @@ class sql implements \ArrayAccess{
 	}
 	/**
 	 * 执行sql语句
-	 * @param \nx\helpers\db\pdo|null $db
-	 * @return \nx\helpers\db\pdo\result
+	 *
+	 * @param pdo|null $db
+	 * @return result
 	 */
-	public function execute(pdo $db=null){
-		$pdo =$db ?? $this->db ?? null;
+	public function execute(pdo $db=null): result{
+		$pdo =$db ?? $this->db;
+		if(null ===$pdo) return new result(false);
 		$sql =(string)$this;
-		switch($this->action){
-			case 'insert':
-				return $pdo->insert($sql, $this->params);
-			case 'update':
-			case 'delete':
-				return $pdo->execute($sql, $this->params);
-			case 'select':
-				return $pdo->select($sql, $this->params);
-		}
+		return match ($this->action) {
+			'insert' => $pdo->insert($sql, $this->params),
+			'update', 'delete' => $pdo->execute($sql, $this->params),
+			'select' => $pdo->select($sql, $this->params),
+			default => new result(false),
+		};
 	}
 	//-------------------------------------------------------------------------------------------------------------
 	/**
 	 * 向表格中插入数据 insert
-	 * @param array[string $field =>any] $fields
+	 *
+	 * @param array $fields [string $field =>any]
 	 * @param array $options
-	 * @return \nx\helpers\db\sql
+	 * @return sql
 	 */
-	public function create($fields=[], array $options=[]):sql{
+	public function create(array $fields=[], array $options=[]):static{
 		$this->set =$fields;
 		$this->options =$options;
 		$this->action ='insert';
 		return $this;
 	}
-	public function update($fields=[], array $options=[]):sql{
+	public function update($fields=[], array $options=[]):static{
 		$this->set =$fields;
 		$this->options =$options;
 		$this->action ='update';
 		return $this;
 	}
-	public function delete(array $options=[]):sql{
+	public function delete(array $options=[]):static{
 		$this->options =$options;
 		$this->action ='delete';
 		return $this;
 	}
-	public function select($fields=[], array $options=[]):sql{
+	public function select($fields=[], array $options=[]):static{
 		$this->select=$fields;
 		$this->options =$options;
 		$this->action ='select';
@@ -605,49 +611,50 @@ class sql implements \ArrayAccess{
 	//-------------------------------------------------------------------------------------------------------------
 	/**
 	 * https://dev.mysql.com/doc/refman/8.0/en/join.html
-	 * @param \nx\helpers\db\sql $table2
-	 * @param string|null        $on  USING => ['id'], ON => ['id'=>'id'], ['id'=>$user['id']] $user['id'] $user('123')
-	 * @param array              $options
-	 * @return \nx\helpers\db\sql
+	 * @param sql         $table2
+	 * @param string|null $on USING => ['id'], ON => ['id'=>'id'], ['id'=>$user['id']] $user['id'] $user('123')
+	 * @param array       $options
+	 * @return sql
 	 */
-	public function join(sql $table2, $on=null, array $options=[]):sql{
+	public function join(sql $table2, mixed $on=null, array $options=[]):static{
 		$this->join[] =[$table2, $on, $options];
 		return $this;
 	}
 	//-------------------------------------------------------------------------------------------------------------
-	public function where(...$conditions):sql{
+	public function where(...$conditions):static{
 		$this->where=$conditions;
 		return $this;
 	}
-	public function limit(int $rows, int $offset=0):sql{
+	public function limit(int $rows, int $offset=0):static{
 		$this->first =($rows===1);
 		$this->limit =[$rows, $offset];
 		return $this;
 	}
-	public function page(int $page, int $max=20):sql{
+	public function page(int $page, int $max=20):static{
 		$this->first =false;
 		$this->limit =[$max, ($page -1)*$max];
 		return $this;
 	}
-	public function sort($fields=null, $sort='ASC'):sql{
+	public function sort($fields=null, $sort='ASC'):static{
 		$this->sort =[$fields, $sort];
 		return $this;
 	}
-	public function group($fields=[], $sort='ASC'):sql{
+	public function group($fields=[], $sort='ASC'):static{
 		$this->group =[$fields, $sort];
 		return $this;
 	}
-	public function having(...$conditions):sql{
+	public function having(...$conditions):static{
 		$this->having =$conditions;
 		return $this;
 	}
 	//-------------------------------------------------------------------------------------------------------------
 	/**
 	 * 设置别名
+	 *
 	 * @param string $name
-	 * @return \nx\helpers\db\sql
+	 * @return sql
 	 */
-	public function as(string $name):sql{
+	public function as(string $name):static{
 		$tab =clone $this;
 		$tab->tableAS =$name;
 		return $tab;
@@ -655,15 +662,15 @@ class sql implements \ArrayAccess{
 	public function formatField($name=null, $withTable =true):string{
 		if($name instanceof sql\part) return (string)$name;
 		$value =$name??$this->primary;
-		$field = ('*'===$value) ?$value :"`{$value}`";
-		$table =$this->tableAS ?"`{$this->tableAS}`" :"`{$this->table}`";
-		return $withTable ?"{$table}.{$field}" :$field;
+		$field = ('*'===$value) ?$value :"`$value`";
+		$table =$this->tableAS ?"`$this->tableAS`" :"`$this->table`";
+		return $withTable ?"$table.$field" :$field;
 	}
 	public function getFormatName($withAS =true):string{
-		if($withAS) return $this->tableAS ?"`{$this->table}` `{$this->tableAS}`" : "`{$this->table}`";
-		else return "`{$this->table}`";
+		if($withAS) return $this->tableAS ?"`$this->table` `$this->tableAS`" : "`$this->table`";
+		else return "`$this->table`";
 	}
-	public static function formatValue($value, sql $table=null){
+	public static function formatValue($value, sql $table=null): string{
 		switch(gettype($value)){
 			case 'object':
 				if($table && $table->collectParams && ($value instanceof sql\part)){
@@ -680,7 +687,7 @@ class sql implements \ArrayAccess{
 					$table->params[]=$value;//(string)
 					return '?';
 				}
-				return "\"{$value}\"";
+				return "\"$value\"";
 			case 'boolean':
 				return $value ?'TRUE' :'FALSE';
 			case 'NULL':
@@ -706,13 +713,24 @@ class sql implements \ArrayAccess{
 			foreach($where as $cond){
 				if(is_array($cond)){// ->where(['id'=>1, 'status'=>2, sql\part()])
 					foreach($cond as $field=>$value){// id => 1 , any =>sql\part()
-						$_conditions[] =$value instanceof sql\part? $value : $this[$field]->equal($this($value));
+						if($value instanceof sql\part){
+							$_c =$value;
+						} elseif(is_array($value)){
+							if(array_key_exists('fn', $value)){
+								$fn =$value['fn'];
+								unset($value['fn']);
+								$_c =$this[$field]->$fn(...array_map(fn($v)=>$this($v), $value));
+							} else $_c =$this[$field]->in($value);
+						} else{
+							$_c=$this[$field]->equal($this($value));
+						}
+						$_conditions[] =$_c;
 					}
 					continue;
 				} elseif(!($cond instanceof sql\part)) $cond =$this[null]->equal($this($cond));
-				$_conditions[] =$cond;//todo 值收集关联到当前表(联合查询时其中一表条件值的收集)
+				$_conditions[] =$cond;
 			}
-			$_where =count($_conditions) ? " {$command} ".implode(' AND ', $_conditions) : '';
+			$_where =count($_conditions) ? " $command ".implode(' AND ', $_conditions) : '';
 		} else $_where ='';
 		return $_where;
 	}
@@ -741,7 +759,7 @@ class sql implements \ArrayAccess{
 		$_cols =[];
 		$_prepares =[];
 		foreach($cols as $col=>$value){
-			$_cols[] ="`{$col}`";//$col instanceof sql\part ?$col :new sql\part($col, 'field', $table);
+			$_cols[] ="`$col`";//$col instanceof sql\part ?$col :new sql\part($col, 'field', $table);
 			$_prepares[] =$is_named ?':'.$col->value :'?';
 		}
 		$params =[];
@@ -766,7 +784,7 @@ class sql implements \ArrayAccess{
 
 			$_value =$this::formatValue($value, $this);
 			$_field =$this->formatField($field);
-			$params[] ="{$_field} = {$_value}";
+			$params[] ="$_field = $_value";
 		}
 		return " SET ".implode(', ', $params);
 	}
@@ -795,7 +813,7 @@ class sql implements \ArrayAccess{
 					$_f =$this->formatField($_sort);
 					$_s =$this->buildSortSC($sort);
 				} elseif($_field instanceof sql\part) {
-					$_f =$field->getAs() ?"`{$field->getAs()}`": (string)$field;
+					$_f =$_field->getAs() ?"`{$_field->getAs()}`": (string)$_field;
 					$_s =$this->buildSortSC($_sort ?? $sort);
 				} else trigger_error('无效的字段类型');
 				$_sorts[$_f] =$_s;
@@ -806,15 +824,15 @@ class sql implements \ArrayAccess{
 		else trigger_error('无效的字段类型');
 		$_s =[];
 		foreach($_sorts as $_field =>$_asc){
-			$_s[] ='GROUP'===$command ? $_field : "{$_field} {$_asc}";
+			$_s[] ='GROUP'===$command ? $_field : "$_field $_asc";
 		}
-		return count($_s) ?" {$command} BY ".implode(", ", $_s) :'';
+		return count($_s) ?" $command BY ".implode(", ", $_s) :'';
 	}
 	protected function buildLimit($limit):string{
 		if(empty($limit)) return '';
 		[$rows, $offset] =$limit ?? ['', 0];
 		if(empty($rows)) return '';
-		return 0 === $offset ?" LIMIT {$rows}" :" LIMIT {$offset}, {$rows}";
+		return 0 === $offset ?" LIMIT $rows" :" LIMIT $offset, $rows";
 	}
 	public function __toString(){
 		$this->params=[];//清空所有参数，重新构建
@@ -835,7 +853,7 @@ class sql implements \ArrayAccess{
 				$where =$this->buildWhere($this->where);
 				$order =$this->buildSort($this->sort);
 				$limit =$this->buildLimit($this->limit);
-				return "DELETE{$priority}{$quick}{$ignore} FROM {$table}{$where}{$order}{$limit}";
+				return "DELETE$priority$quick$ignore FROM $table$where$order$limit";
 			case 'insert':
 				/**
 				 * 13.2.6 INSERT Syntax
@@ -870,7 +888,7 @@ class sql implements \ArrayAccess{
 				//$set =[]; //ON DUPLICATE KEY UPDATE col_name=expr, ...
 				[$cols, $prepares, $this->params] =$this->buildInsertValue($this->set);
 				$table =$this->getFormatName(false);
-				return "INSERT{$priority}{$ignore} INTO {$table} ({$cols}) VALUES ($prepares)";
+				return "INSERT$priority$ignore INTO $table ($cols) VALUES ($prepares)";
 			case 'update':
 				/**
 				 * 13.2.12 UPDATE Syntax
@@ -897,7 +915,7 @@ class sql implements \ArrayAccess{
 				$order =$this->buildSort($this->sort);
 				$limit =$this->buildLimit($this->limit);
 				$table =$this->getFormatName();
-				return "UPDATE{$priority}{$ignore} {$table} {$set}{$where}{$order}{$limit}";
+				return "UPDATE$priority$ignore $table $set$where$order$limit";
 			case 'select':
 				/**
 				 * 13.2.10 SELECT Syntax
@@ -929,8 +947,7 @@ class sql implements \ArrayAccess{
 				 * 			[FOR {UPDATE | SHARE} [OF tbl_name [, tbl_name] ...] [NOWAIT | SKIP LOCKED]
 				 * 			| LOCK IN SHARE MODE]
 				 * 		]
-				 */
-				/**
+				 *
 				 * table_references:
 				 * 				escaped_table_reference [, escaped_table_reference] ...
 				 * escaped_table_reference:
@@ -976,7 +993,7 @@ class sql implements \ArrayAccess{
 				$order =$this->buildSort($this->sort);
 				$limit =$this->buildLimit($this->limit);
 				$options =$this->buildOptions('DISTINCT,DISTINCTROW,HIGH_PRIORITY,STRAIGHT_JOIN,SQL_SMALL_RESULT,SQL_BIG_RESULT,SQL_BUFFER_RESULT,SQL_NO_CACHE,SQL_CALC_FOUND_ROWS', $this->options);
-				return "SELECT{$options} {$select} FROM {$table}{$join}{$where}{$group}{$having}{$order}{$limit}";
+				return "SELECT$options $select FROM $table$join$where$group$having$order$limit";
 			case 'do':
 			default:
 				/**
@@ -1002,11 +1019,11 @@ class sql implements \ArrayAccess{
 			foreach($join[1] as $joinField =>$field){
 				$j =$join[0]->formatField(empty($joinField) ?null :$joinField);
 				$t =$this->formatField($field);
-				$on[] ="{$j} = $t";
+				$on[] ="$j = $t";
 			}
 			$keyword =in_array('STRAIGHT', $join[2]) ?'STRAIGHT_JOIN' :'JOIN';
 			$_on =implode(' AND ', $on);
-			$_joins[]="{$options} {$keyword} {$table} ON ({$_on})";
+			$_joins[]="$options $keyword $table ON ($_on)";
 
 			$select =$join[0]->buildSelect(false);
 			if(''!==$select) $_select[] =$select;
@@ -1016,7 +1033,7 @@ class sql implements \ArrayAccess{
 		} else $select ='';
 		return [implode("", $_joins), $select];
 	}
-	protected function buildOptions($in='', $options=[]){
+	protected function buildOptions($in='', $options=[]): string{
 		if(!is_array($options)) return '';
 		$r=[];
 		foreach(explode(',', $in) as $opt){
@@ -1030,7 +1047,7 @@ class sql implements \ArrayAccess{
 	/**
 	 * @param $name
 	 * @param $arguments
-	 * @return \nx\helpers\db\sql\part
+	 * @return part
 	 */
 	public static function __callStatic($name, $arguments):sql\part{
 		return (new sql\part($name, 'function'))->arguments(...$arguments);
@@ -1040,16 +1057,16 @@ class sql implements \ArrayAccess{
 		//
 	}
 	public function offsetExists($offset):bool{
-		//
+		return false;
 	}
 	public function offsetUnset($offset):void{
 		//
 	}
 	/**
 	 * @param mixed $offset
-	 * @return \nx\helpers\db\sql\part
+	 * @return part
 	 */
-	public function offsetGet($offset):sql\part{
+	public function offsetGet(mixed $offset):sql\part{
 		return new sql\part($offset, 'field',$this);
 	}
 }
