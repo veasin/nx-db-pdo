@@ -21,7 +21,7 @@ class result{
 	 * @var bool
 	 */
 	protected bool $result=false;
-	public function __construct(bool $result, \PDOStatement $sth=null, \PDO $pdo=null){
+	public function __construct(bool $result, ?\PDOStatement $sth=null, ?\PDO $pdo=null){
 		$this->sth=$sth;
 		$this->pdo=$pdo;
 		$this->result=$result;
@@ -88,7 +88,7 @@ class result{
 	 * @param ...$fetch_styles
 	 * @return mixed
 	 */
-	public function fetchAllMap($callback, ...$fetch_styles){
+	public function fetchAllMap($callback, ...$fetch_styles): mixed{
 		if(0 === count($fetch_styles)) $fetch_styles[]=$this->pdo::FETCH_ASSOC;
 		$r=$this->fetchAll(...$fetch_styles);
 		return call_user_func($callback, $r);

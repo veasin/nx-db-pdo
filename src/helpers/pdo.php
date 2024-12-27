@@ -55,7 +55,7 @@ class pdo{
 			count($data) && call_user_func($this->_log, $data);
 		}
 	}
-	public function logFormatSQL(string $prepare, array $params=null, string $action=''): void{
+	public function logFormatSQL(string $prepare, ?array $params=null, string $action=''): void{
 		$params=$params ?? [];
 		$sql=str_replace('?', '%s', $prepare);
 		$prefix='  ';
@@ -87,7 +87,7 @@ class pdo{
 	 * @param array|null $params
 	 * @return result
 	 */
-	public function insert(string $sql, array $params=null):pdo\result{
+	public function insert(string $sql, ?array $params=null):pdo\result{
 		$this->logFormatSQL($sql, $params, 'insert');
 		$db=$this->db();
 		$ok=false;
@@ -116,7 +116,7 @@ class pdo{
 	 * @param array|null $params
 	 * @return result
 	 */
-	public function select(string $sql, array $params=null):pdo\result{
+	public function select(string $sql, ?array $params=null):pdo\result{
 		$this->logFormatSQL($sql, $params);
 		$db=$this->db();
 		$sth=$db->prepare($sql);
@@ -132,7 +132,7 @@ class pdo{
 	 * @param array|null $params
 	 * @return result
 	 */
-	public function execute(string $sql, array $params=null):pdo\result{
+	public function execute(string $sql, ?array $params=null):pdo\result{
 		$this->logFormatSQL($sql, $params);
 		$db=$this->db();
 		$sth=$db->prepare($sql);

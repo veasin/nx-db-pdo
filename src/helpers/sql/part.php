@@ -480,7 +480,7 @@ class part{
 	 * @var part[]
 	 */
 	protected array $parts =[];
-	public function __construct($value, string $type='value', sql $from=null){
+	public function __construct($value, string $type='value', ?sql $from=null){
 		$this->value =$value;
 		$this->type =$type;
 		$this->from =$from;

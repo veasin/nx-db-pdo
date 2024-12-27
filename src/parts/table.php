@@ -17,7 +17,7 @@ trait table{
 	 * @param string|null $config
 	 * @return sql
 	 */
-	protected function table(string $tableName=null, string $primary=null, string $config=null):sql{
+	protected function table(?string $tableName=null, ?string $primary=null, ?string $config=null):sql{
 		return $this->db($config ?? $this->dbConfig)->from($tableName ?? $this->tableName, $primary ?? $this->tablePrimary ?? 'id');
 	}
 }

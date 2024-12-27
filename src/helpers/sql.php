@@ -553,7 +553,7 @@ class sql implements \ArrayAccess{
 	 * @param string   $primary
 	 * @param pdo|null $db
 	 */
-	public function __construct(string $tableName, string $primary='id', pdo $db=null){
+	public function __construct(string $tableName, string $primary='id', ?pdo $db=null){
 		$n =explode(' ', $tableName, 2);
 		$this->table =$n[0];
 		$this->tableAS =$n[1] ?? '';
@@ -566,7 +566,7 @@ class sql implements \ArrayAccess{
 	 * @param pdo|null $db
 	 * @return result
 	 */
-	public function execute(pdo $db=null): result{
+	public function execute(?pdo $db=null): result{
 		$pdo =$db ?? $this->db;
 		if(null ===$pdo) return new result(false);
 		$sql =(string)$this;
@@ -670,7 +670,7 @@ class sql implements \ArrayAccess{
 		if($withAS) return $this->tableAS ?"`$this->table` `$this->tableAS`" : "`$this->table`";
 		else return "`$this->table`";
 	}
-	public static function formatValue($value, sql $table=null): string{
+	public static function formatValue($value, ?sql $table=null): string{
 		switch(gettype($value)){
 			case 'object':
 				if($table && $table->collectParams && ($value instanceof sql\part)){
