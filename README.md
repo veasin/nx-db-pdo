@@ -5,7 +5,7 @@ pdo for nx
 
 > composer require veasin/nx-db-pdo
 
-```
+```php
 'db/pdo'=>[
     'default' => [
         'dsn' => 'mysql:dbname=db_name;host=host_url;charset=utf8mb4',
@@ -15,4 +15,10 @@ pdo for nx
         ],
     ],
 ]
+```
+
+```php
+$this->db()->execute("SELECT * FROM `user`");
+$this->table("user")->select()->execute();
+    //$this->db()->from("user");
 ```
