@@ -16,9 +16,15 @@ pdo for nx
     ],
 ]
 ```
+```php
+class app extends nx\app{
+    use \nx\parts\db\pdo;
+} 
+```
+
 
 ```php
 $this->db()->execute("SELECT * FROM `user`");
 $this->table("user")->select()->execute();
-    //$this->db()->from("user");
+//$this->db()->from("user");
 ```

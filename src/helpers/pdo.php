@@ -1,169 +1,90 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Vea
- * Date: 2019/04/17 017
- * Time: 11:37
- */
 declare(strict_types=1);
+
 namespace nx\helpers\db;
 
+use Closure;
 use nx\helpers\db\pdo\result;
 
 class pdo{
-	private array $_nx_db_pdo_options=[
-		\PDO::ATTR_DEFAULT_FETCH_MODE=>\PDO::FETCH_ASSOC,
-		\PDO::ATTR_STRINGIFY_FETCHES=>false,
-		\PDO::ATTR_EMULATE_PREPARES=>false,
+	private array $_nx_db_pdo_options = [
+		\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+		\PDO::ATTR_STRINGIFY_FETCHES => false,
+		\PDO::ATTR_EMULATE_PREPARES => false,
 	];
-	private int $timeout;//超时
-	/**
-	 * @var \PDO|null
-	 */
-	public ?\PDO $link=null;
-	private array $setup;
-	/**
-	 * @var callable
-	 */
-	private $_log=null;
-	public function __construct($setup=[]){
-		$this->setup=$setup ?? [];
-		$this->timeout=$this->setup['timeout'] ?? 0;
-		$this->setup['options']=($this->setup['options'] ?? []) + $this->_nx_db_pdo_options;
+	private int $timeout;
+	private ?\PDO $link = null;
+	//private array $setup;
+	private ?Closure $_log = null;
+	public function __construct(private array $setup = []){
+		$this->setup['options'] = ($this->setup['options'] ?? []) + $this->_nx_db_pdo_options;
+		$this->timeout = $this->setup['timeout'] ?? 0;
 	}
-	/**
-	 * @return \PDO
-	 */
-	private function db():\PDO{
-		$now=time();
-		if(null === $this->link || ($this->timeout > 0 && $this->timeout < $now)){
-			$this->link=new \PDO($this->setup['dsn'], $this->setup['username'], $this->setup['password'], $this->setup['options']);
-			$this->timeout=(($this->setup['timeout'] ?? 0) > 0) ?$now + $this->setup['timeout'] :0;
+	public function setLog(callable $logger): void{
+		$this->_log = $logger(...);
+	}
+	private function db(): \PDO{
+		$now = time();
+		if(!$this->link || ($this->timeout > 0 && $this->timeout < $now)){
+			$this->link = new \PDO($this->setup['dsn'], $this->setup['username'], $this->setup['password'], $this->setup['options']);
+			$this->timeout = ($this->setup['timeout'] ?? 0) > 0 ? $now + $this->setup['timeout'] : 0;
 		}
 		return $this->link;
 	}
-	public function setLog(callable $logger): void{
-		$this->_log=$logger;
+	private function log(string $template, array $data = []): void{
+		$this->_log?->__invoke($template, 'sql');
+		if($data) $this->_log?->__invoke($data, 'data');
 	}
-	/**
-	 * @param string $template
-	 * @param array  $data
-	 */
-	private function log(string $template, array $data=[]): void{
-		if(null !== $this->_log){
-			call_user_func($this->_log, $template , 'sql');
-			count($data) && call_user_func($this->_log, $data);
-		}
-	}
-	public function logFormatSQL(string $prepare, ?array $params=null, string $action=''): void{
-		$params=$params ?? [];
-		$sql=str_replace('?', '%s', $prepare);
-		$prefix='  ';
-		$map=function($value){
-			return gettype($value) === 'integer' ?$value :"\"$value\"";
-		};
-		if('insert' === $action){
-			$_first=current($params);
-			if(is_array($_first)){
-				foreach($params as $param){
-					$this->log($prefix.sprintf($sql, ...array_map($map, $param)));
-				}
-				return;
+	private function logFormatSQL(string $prepare, ?array $params = null, string $action = ''): void{
+		$params ??= [];
+		$sql = str_replace('?', '%s', $prepare);
+		$map = fn($v) => is_int($v) ? $v : "\"$v\"";
+		if($action === 'insert' && ($params[0] ?? []) instanceof \Traversable){
+			foreach($params as $p){
+				$this->log(' ' . sprintf($sql, ...array_map($map, $p)));
 			}
+			return;
 		}
-		$this->log($prefix.sprintf($sql, ...array_map($map, $params)));
+		$this->log(' ' . sprintf($sql, ...array_map($map, $params)));
 	}
-	/**
-	 * @return result|null
-	 */
-	private function failed():?result{
+	private function failed(): result{
 		$this->log('sql error: %s %s %s', $this->link->errorInfo());
 		return new result(false, null, $this->db());
 	}
-	/**
-	 * 直接插入方法
-	 * ->insert('INSERT INTO cds (`interpret`, `title`) VALUES (?, ?)', ['vea', 'new cd']);
-	 * @param string     $sql
-	 * @param array|null $params
-	 * @return result
-	 */
-	public function insert(string $sql, ?array $params=null):pdo\result{
-		$this->logFormatSQL($sql, $params, 'insert');
-		$db=$this->db();
-		$ok=false;
-        $sth = null;
-		if(0 === count($params)){
-			$ok=$db->exec($sql);
-            if(false !==$ok) $ok =true;
-		}else{
-			$sth=$db->prepare($sql);
-			if(false === $sth) return $this->failed();
-			$_first=current($params);
-			if(!is_array($_first)){
-				$ok=$sth->execute($params);
-			}else{
-				foreach($params as $_fields){
-					$ok=$sth->execute($_fields);
-				}
+	private function prepareAndExecute(string $sql, ?array $params, string $action): result{
+		$this->logFormatSQL($sql, $params, $action);
+		$db = $this->db();
+		try{
+			if(empty($params)){
+				$stmt = $db->query($sql);
+				return new result($stmt !== false, $stmt, $db);
 			}
+			$stmt = $db->prepare($sql);
+			if(!$stmt) return $this->failed();
+			$isMulti = isset($params[0]) && is_array($params[0]);
+			$success = $isMulti ? array_product(array_map(fn($p) => $stmt->execute($p), $params)) : $stmt->execute($params);
+			return new result((bool)$success, $stmt, $db);
+		}catch(\PDOException $e){
+			return $this->failed();
 		}
-		return new result($ok, $sth, $db);
 	}
-	/**
-	 * 选择记录
-	 * ->select('SELECT `cds`.* FROM `cds` WHERE `cds`.`id` = ?', [13])
-	 * @param string     $sql
-	 * @param array|null $params
-	 * @return result
-	 */
-	public function select(string $sql, ?array $params=null):pdo\result{
-		$this->logFormatSQL($sql, $params);
-		$db=$this->db();
-		$sth=$db->prepare($sql);
-		if(false === $sth) return $this->failed();
-		$ok=$sth->execute($params ?? []);
-		return new result($ok, $sth, $db);
-	}
-	/**
-	 * 更新记录
-	 * 删除记录
-	 * ->update('UPDATE `cds` SET `interpret` =? WHERE `cds`.`id` = ?', ['vea', 14])
-	 * @param string     $sql
-	 * @param array|null $params
-	 * @return result
-	 */
-	public function execute(string $sql, ?array $params=null):pdo\result{
-		$this->logFormatSQL($sql, $params);
-		$db=$this->db();
-		$sth=$db->prepare($sql);
-		if(false === $sth) return $this->failed();
-		$ok=$sth->execute($params);
-		return new result($ok, $sth, $db);
-	}
-	/**
-	 * 事务
-	 * @param callable $fun arg[model:$this] return ===true is rollback
-	 * @return null|mixed
-	 */
-	public function transaction(callable $fun):?bool{
+	public function insert(string $sql, ?array $params = null): result{ return $this->prepareAndExecute($sql, $params, 'insert'); }
+	public function select(string $sql, ?array $params = null): result{ return $this->prepareAndExecute($sql, $params, 'select'); }
+	public function execute(string $sql, ?array $params = null): result{ return $this->prepareAndExecute($sql, $params, 'update'); }
+	public function transaction(callable $func): ?bool{
 		$this->log('sql transaction begin:');
-		$db=$this->db();
+		$db = $this->db();
 		$db->beginTransaction();
-		$rollback=$fun($this);
-		if($rollback === true){
+		try{
+			$rollback = $func($this);
+			$rollback ? $db->rollBack() : $db->commit();
+			$this->log('sql transaction end.');
+			return $rollback;
+		}catch(\Exception $e){
 			$db->rollBack();
-			$rollback=null;
-		}else $db->commit();
-		$this->log('sql transaction end.');
-		return $rollback;
+			$this->log('sql transaction rollback: ' . $e->getMessage());
+			return null;
+		}
 	}
-	/**
-	 * 返回table对象
-	 * @param string $tableName
-	 * @param string $primary
-	 * @return sql
-	 */
-	public function from(string $tableName, string $primary='id'): sql{
-		return new sql($tableName, $primary, $this);
-	}
+	public function from(string $tableName, string $primary = 'id'): sql{ return new sql($tableName, $primary, $this); }
 }

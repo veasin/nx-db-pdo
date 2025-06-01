@@ -1,31 +1,13 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Vea
- * Date: 2019/05/05 005
- * Time: 17:30
- */
 declare(strict_types=1);
 namespace nx\helpers\db\pdo;
 
 class result{
-	/**
-	 * @var \PDOStatement|null
-	 */
-	protected ?\PDOStatement $sth=null;
-	/**
-	 * @var \PDO|null
-	 */
-	protected ?\PDO $pdo;
-	/**
-	 * @var bool
-	 */
-	protected bool $result=false;
-	public function __construct(bool $result, ?\PDOStatement $sth=null, ?\PDO $pdo=null){
-		$this->sth=$sth;
-		$this->pdo=$pdo;
-		$this->result=$result;
-	}
+	public function __construct(
+		protected bool $result,
+		protected ?\PDOStatement $sth = null,
+		protected ?\PDO $pdo = null
+	){}
 	public function ok():bool{
 		return $this->result;
 	}
@@ -35,21 +17,22 @@ class result{
 	 *
 	 */
 	public function rowCount():?int{
-		if(false === $this->result) return null;else return $this->sth->rowCount();
+		return $this->result ? $this->sth?->rowCount() : null;
 	}
 	public function lastInsertId():?int{
-		if(false === $this->result) return null;else return (int)$this->pdo->lastInsertId();
+		return $this->result ? (int)$this->pdo?->lastInsertId() : null;
 	}
-	public function first($className=null, ...$args){
-		if(false === $this->result) return null;elseif(null === $className) return $this->fetch($this->pdo::FETCH_ASSOC, $this->pdo::FETCH_ORI_FIRST);
-		else{
-			$o=$this->sth->fetchObject($className, $args);
-			return false !== $o ?$o :null;
-		}
+	public function first($className=null, ...$args):mixed{
+		if(!$this->result) return null;
+		return $className
+			? ($this->sth->fetchObject($className, $args) ?: null)
+			: $this->sth->fetch(\PDO::FETCH_ASSOC, \PDO::FETCH_ORI_FIRST);
 	}
 	public function all($className=null, ...$args):?array{
-		if(false === $this->result) return null;elseif(null === $className) return $this->fetchAll($this->pdo::FETCH_ASSOC);
-		else return $this->fetchAll($this->pdo::FETCH_CLASS, $className, $args);
+		if(!$this->result) return null;
+		return $className
+			? $this->sth->fetchAll(\PDO::FETCH_CLASS, $className, $args)
+			: $this->sth->fetchAll(\PDO::FETCH_ASSOC);
 	}
 	/**
 	 * 获取全部查询结果 后，再对全部数据进行一次回调，根据参数不同进行不同返回
@@ -65,22 +48,19 @@ class result{
 	 * @return array
 	 */
 	public function map(int|string|null $key=0, mixed $value=1):array{
-		$callback=function($array) use ($key, $value){
-			if(!is_array($array)) return $array;
-			$r=[];
-			if(is_null($key)){
-				if($value === false) return $array;
-				foreach($array as $_key=>$_value){
-					$r[]=is_callable($value) ?$value($_value, $_key) :$_value[$value];
-				}
-			}else{
-				foreach($array as $_key=>$_value){
-					$r[$_value[$key]]=($value === false) ?$_value :(is_callable($value) ?$value($_value, $_key) :$_value[$value]);
-				}
-			}
-			return $r;
-		};
-		return $this->fetchAllMap($callback, $this->pdo::FETCH_ASSOC);
+		return $this->fetchAllMap(
+			fn(array $data) => array_reduce($data, function($carry, $item) use ($key, $value) {
+				$k = $key !== null ? $item[$key] : null;
+				$v = match(true) {
+					$value === false => $item,
+					is_callable($value) => $value($item),
+					default => $item[$value]
+				};
+				$key === null ? $carry[] = $v : $carry[$k] = $v;
+				return $carry;
+			}, []),
+			\PDO::FETCH_ASSOC
+		) ?? [];
 	}
 	/**
 	 * 获取全部查询结果 后，再对全部数据进行一次回调
@@ -89,7 +69,7 @@ class result{
 	 * @return mixed
 	 */
 	public function fetchAllMap($callback, ...$fetch_styles): mixed{
-		if(0 === count($fetch_styles)) $fetch_styles[]=$this->pdo::FETCH_ASSOC;
+		$fetch_styles = $fetch_styles ?: [\PDO::FETCH_ASSOC];
 		$r=$this->fetchAll(...$fetch_styles);
 		return call_user_func($callback, $r);
 	}
@@ -100,15 +80,14 @@ class result{
 	 * @return array|null
 	 */
 	public function fetchMap($callback, ...$fetch_styles):?array{
-		if(0 === count($fetch_styles)) $fetch_styles[]=$this->pdo::FETCH_ASSOC;
+		$fetch_styles = $fetch_styles ?: [\PDO::FETCH_ASSOC];
 		$r=$this->fetchAll(...$fetch_styles);
-		if(is_array($r)){
-			$rr=[];
-			foreach($r as $index=>$array){
-				$rr[]=call_user_func($callback, $array, $index);
-			}
-			return $rr;
-		}else return $r;
+		if(null===$r) return null;
+		$rr=[];
+		foreach($r as $index=>$array){
+			$rr[]=call_user_func($callback, $array, $index);
+		}
+		return $rr;
 	}
 	/**
 	 * 获取一条查询结果
@@ -116,10 +95,7 @@ class result{
 	 * @return array|null
 	 */
 	public function fetch(...$args):?array{
-		if(false === $this->result) return null;else{
-			$r=$this->sth->fetch(...$args);
-			return false !== $r ?$r :null;
-		}
+		return $this->result ? ($this->sth->fetch(...$args) ?: null) : null;
 	}
 	/**
 	 * 获取全部查询结果
@@ -127,9 +103,6 @@ class result{
 	 * @return array|null
 	 */
 	public function fetchAll(...$args):?array{
-		if(false === $this->result) return null;else{
-			$r=$this->sth->fetchAll(...$args);
-			return false !== $r ?$r :null;
-		}
+		return $this->result ? ($this->sth->fetchAll(...$args) ?: null) : null;
 	}
 }
