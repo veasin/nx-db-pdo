@@ -98,3 +98,9 @@ $table->group($serviceTable['id']);
 $serviceTable->select(['*']);
 test::case('select', (string)$table)
 	->toBe('SELECT `corp_service`.`corp_id`, `corp_service`.`state_enable`, `service`.* FROM `corp_service` INNER JOIN `service` ON (`service`.`id` = `corp_service`.`service_id` AND `service`.`deleted_at` = ?) WHERE `corp_service`.`corp_id` = ? AND `corp_service`.`deleted_at` = ? GROUP BY `service`.`id` ORDER BY `corp_service`.`id` DESC LIMIT 10');
+
+
+$table =new sql('test');
+$table->select([]);
+$table->where([]);
+test::case('where empty', (string)$table)->toBe('SELECT * FROM `test`');

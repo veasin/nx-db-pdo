@@ -391,7 +391,7 @@ class sql implements \ArrayAccess{
 			}
 			else $_conditions[] = $cond instanceof sql\part ? $cond : $this[null]->equal($this($cond));
 		}
-		return " $command " . implode(' AND ', $_conditions);
+		return !$_conditions ?"": " $command " . implode(' AND ', $_conditions);
 	}
 	protected function buildFields(bool $only = true): string{
 		if(null === $this->select) return '';
