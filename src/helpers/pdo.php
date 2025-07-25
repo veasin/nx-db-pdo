@@ -39,7 +39,7 @@ class pdo{
 		$params ??= [];
 		$sql = str_replace('?', '%s', $prepare);
 		$map = fn($v) => is_int($v) ? $v : "\"$v\"";
-		if($action === 'insert' && ($params[0] ?? []) instanceof \Traversable){
+		if($action === 'insert' && (is_array($params[0] ?? null) || ($params[0] ?? null) instanceof \Traversable)){
 			foreach($params as $p){
 				$this->log(' ' . sprintf($sql, ...array_map($map, $p)));
 			}
