@@ -24,9 +24,10 @@ class result{
 	}
 	public function first($className=null, ...$args):mixed{
 		if(!$this->result) return null;
-		return $className
-			? ($this->sth->fetchObject($className, $args) ?: null)
+		$r =$className
+			? $this->sth->fetchObject($className, $args)
 			: $this->sth->fetch(\PDO::FETCH_ASSOC, \PDO::FETCH_ORI_FIRST);
+		return $r ?: null;
 	}
 	public function all($className=null, ...$args):?array{
 		if(!$this->result) return null;
