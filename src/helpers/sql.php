@@ -4,6 +4,7 @@ namespace nx\helpers\db;
 
 use nx\helpers\db\pdo\result;
 use nx\helpers\db\sql\part;
+use nx\helpers\db\sql\part\type;
 
 class sql implements \ArrayAccess{
 	const string
@@ -26,6 +27,13 @@ class sql implements \ArrayAccess{
 	protected ?array $limit = null, $sort = null, $group = null;
 	protected string $action = '';//最后一次操作
 	protected ?string $as = null;//别名
+	/**
+	 * 初始化 SQL 构建器实例
+	 *
+	 * @param string      $table     表名（支持别名：如 "users u"）
+	 * @param string      $primary   当前表的主键字段，默认为 'id'
+	 * @param pdo|null    $db        数据库连接对象，用于执行查询
+	 */
 	public function __construct(protected string $table,//表名
 		protected string $primary = 'id',//当前表的主键名
 		protected ?pdo $db = null
@@ -33,10 +41,10 @@ class sql implements \ArrayAccess{
 		[$this->table, $this->as] = explode(' ', "$table", 2) + ['', ''];
 	}
 	/**
-	 * 执行sql语句
+	 * 执行当前构建的 SQL 语句
 	 *
-	 * @param pdo|null $db
-	 * @return result
+	 * @param pdo|null $db 可选的数据库连接对象，若未提供则使用构造函数传入的对象
+	 * @return result 查询结果对象
 	 */
 	public function execute(?pdo $db = null): result{
 		return ($pdo = $db ?? $this->db) ? match ($this->action) {
@@ -55,36 +63,64 @@ class sql implements \ArrayAccess{
 		return $this;
 	}
 	/**
-	 * 向表中插入数据 insert
+	 * 插入数据（已弃用，请使用 insert 方法）
 	 *
-	 * @param array $fields [string $field =>any]
-	 * @param array $options
-	 * @return sql
-	 * @see        sql::insert
+	 * @param array      $fields  要插入的字段与值 [field => value]
+	 * @param array      $options 可选参数，例如 ['priority' => 'LOW_PRIORITY']
+	 * @return sql 当前对象用于链式调用
 	 * @deprecated 2025/06/01
 	 */
 	public function create(array $fields = [], array $options = []): static{
 		return $this->setup('insert', $fields, $options);
 	}
+	/**
+	 * 设置插入操作的数据
+	 *
+	 * @param array      $fields  要插入的字段与值 [field => value]
+	 * @param array      $options 可选参数，例如 ['priority' => 'LOW_PRIORITY', 'ignore' => true]
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function insert(array $fields = [], array $options = []): static{
 		return $this->setup('insert', $fields, $options);
 	}
+	/**
+	 * 设置更新操作的数据
+	 *
+	 * @param array      $fields  要更新的字段与值 [field => value]
+	 * @param array      $options 可选参数，例如 ['priority' => 'LOW_PRIORITY', 'ignore' => true]
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function update($fields = [], array $options = []): static{
 		return $this->setup('update', $fields, $options);
 	}
+	/**
+	 * 设置删除操作
+	 *
+	 * @param array      $options 可选参数，例如 ['priority' => 'LOW_PRIORITY', 'ignore' => true]
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function delete(array $options = []): static{
 		return $this->setup('delete', [], $options);
 	}
-	public function select($fields = [], array $options = []): static{
+	/**
+	 * 设置选择操作的字段
+	 *
+	 * @param array|string|part|null $fields  字段列表或表达式，如 ['id', 'name'] 或 '*'
+	 * @param array             $options 可选参数，例如 ['distinct' => true, 'sql_no_cache' => true]
+	 * @return sql 当前对象用于链式调用
+	 */
+	public function select(array|string|part|null $fields = [], array $options = []): static{
 		return $this->setup('select', $fields, $options);
 	}
 	//-------------------------------------------------------------------------------------------------------------
 	/**
+	 * 添加 JOIN 查询子句
 	 * https://dev.mysql.com/doc/refman/8.0/en/join.html
-	 * @param sql         $table2
-	 * @param string|null $on USING => ['id'], ON => ['id'=>'id'], ['id'=>$user['id']] $user['id'] $user('123')
-	 * @param array       $options
-	 * @return sql
+	 *
+	 * @param sql         $table2 要连接的表对象
+	 * @param mixed       $on     连接条件，可以是数组 ['field1' => 'field2'] 或字符串或 part 对象 USING => ['id'], ON => ['id'=>'id'], ['id'=>$user['id']] $user['id'] $user('123')
+	 * @param array       $options 额外选项，如 ['LEFT', 'STRAIGHT']
+	 * @return sql 当前对象用于链式调用
 	 */
 	public function join(sql $table2, mixed $on = null, array $options = []): static{
 		$table2->joinTo = $this;
@@ -92,46 +128,115 @@ class sql implements \ArrayAccess{
 		return $this;
 	}
 	//-------------------------------------------------------------------------------------------------------------
+	/**
+	 * 设置 WHERE 查询条件
+	 *
+	 * @param mixed ...$conditions 条件参数，支持多种格式：
+	 *                             - 单个字符串或 part 对象；
+	 *                             - 数组形式 [field => value]；
+	 *                             - 嵌套数组支持复杂逻辑（如 in、between）
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function where(...$conditions): static{
 		$this->where = $conditions;
 		return $this;
 	}
+	/**
+	 * 设置 LIMIT 查询范围
+	 *
+	 * @param int $rows   每页条数
+	 * @param int $offset 偏移量，默认为 0
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function limit(int $rows, int $offset = 0): static{
 		$this->limit = [$rows, $offset];
 		return $this;
 	}
+	/**
+	 * 设置分页查询（基于页码）
+	 *
+	 * @param int $page 当前页码（从1开始）
+	 * @param int $max 每页最大数量，默认为20
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function page(int $page, int $max = 20): static{
 		$this->limit = [$max, ($page - 1) * $max];
 		return $this;
 	}
-	public function sort($fields = null, $sort = 'ASC'): static{
+	/**
+	 * 设置排序字段及方向
+	 *
+	 * @param array|string|part|null $fields 排序字段，可以是单个字段或数组 ['id', 'name DESC']
+	 * @param string                 $sort   排序方式，默认为 ASC（可选：ASC/DESC）
+	 * @return sql 当前对象用于链式调用
+	 */
+	public function sort(array|string|part|null $fields = null, string $sort = 'ASC'): static{
 		$this->sort = [$fields, $sort];
 		return $this;
 	}
-	public function group($fields = [], $sort = 'ASC'): static{
+	/**
+	 * 设置 GROUP BY 子句
+	 *
+	 * @param array|string|part|null $fields 分组字段，如 ['status'] 或 ['status', 'type']
+	 * @param string                 $sort   排序方式，默认为 ASC（可选：ASC/DESC）
+	 * @return sql 当前对象用于链式调用
+	 */
+	public function group(array|string|part|null $fields = [], string $sort = 'ASC'): static{
 		$this->group = [$fields, $sort];
 		return $this;
 	}
+	/**
+	 * 设置 HAVING 查询条件
+	 *
+	 * @param mixed ...$conditions 条件参数，格式与 where 类似
+	 * @return sql 当前对象用于链式调用
+	 */
 	public function having(...$conditions): static{
 		$this->having = $conditions;
 		return $this;
 	}
+	/**
+	 * 给当前表设置别名（返回克隆实例）
+	 *
+	 * @param string $name 别名名称
+	 * @return sql 克隆后的对象
+	 */
 	public function as(string $name): static{
 		$clone = clone $this;
 		$clone->as = $name;
 		return $clone;
 	}
-	public function formatField($name = null, bool $withTable = true): string{
+	/**
+	 * 格式化字段名（添加反引号并处理表名）
+	 *
+	 * @param string|part|null $name      字段名，若为 null 则使用主键
+	 * @param bool             $withTable 是否包含表名前缀，默认 true
+	 * @return string 格式化后的字段名字符串
+	 */
+	public function formatField(string|part|null $name = null, bool $withTable = true): string{
 		if($name instanceof part) return (string)$name;
 		$value = $name ?? $this->primary;
 		$field = ('*' === $value) ? $value : "`$value`";
 		return (!$this->join && !$this->joinTo || !$withTable) ? $field : ($this->as ? "`$this->as`" : "`$this->table`") . ".$field";
 	}
+	/**
+	 * 获取格式化的表名（含别名）
+	 *
+	 * @param bool $withAS 是否包含 AS 别名，默认为 true
+	 * @return string 格式化后的表名字符串
+	 */
 	public function getFormatName(bool $withAS = true): string{
 		return $withAS && $this->as ? "`$this->table` `$this->as`" : "`$this->table`";
 	}
-	public static function formatValue($value, ?sql $table = null): string{
-		if($value instanceof sql\part) return $table && $table->collectParams && $value->type === 'value' ? (string)($table->params[] = $value->value) : (string)$value;
+	/**
+	 * 格式化值（用于占位符替换）
+	 *
+	 * @param mixed   $value 值
+	 * @param sql|null $table 当前表对象，用于参数收集
+	 * @return string 格式化后的字符串
+	 */
+	public static function formatValue(mixed $value, ?sql $table = null): string{
+		if($value instanceof sql\part) return $table && $table->collectParams && $value->type === type::VALUE ? (string)($table->params[] = $value->value) : (string)$value;
 		if($value === '*') return '*';
 		if($value === '\*') return '"*"';
 		if($table && $table->collectParams){
@@ -150,6 +255,11 @@ class sql implements \ArrayAccess{
 			default => (string)$value,
 		};
 	}
+	/**
+	 * 转换为 SQL 字符串（自动构建完整语句）
+	 *
+	 * @return string 构建完成的 SQL 语句
+	 */
 	public function __toString(): string{
 		$this->params = [];
 		return match ($this->action) {
@@ -396,7 +506,7 @@ class sql implements \ArrayAccess{
 	protected function buildFields(bool $only = true): string{
 		if(null === $this->select) return '';
 		$select = is_array($this->select) ? $this->select : [$this->select];
-		return empty($select) ? ($only ? '*' : $this->formatField('*')) : implode(', ', array_map(fn($f) => $f instanceof part ? $f : new part($f, 'field', $this), $select));
+		return empty($select) ? ($only ? '*' : $this->formatField('*')) : implode(', ', array_map(fn($f) => $f instanceof part ? $f : new part($f, type::FIELD, $this), $select));
 	}
 	protected function buildSet(array $set): string{
 		if(!$set) return '';
@@ -427,18 +537,42 @@ class sql implements \ArrayAccess{
 	protected function buildLimit(?array $limit): string{
 		return $limit ? ($limit[1] ? " LIMIT $limit[1], $limit[0]" : " LIMIT $limit[0]") : '';
 	}
-	public function __invoke($value): part{
-		return new part($value, 'value', $this);
+	/**
+	 * 将值包装成 part 对象，用于表达式构造
+	 *
+	 * @param mixed $value 值（支持字符串、数字、布尔等）
+	 * @return part part 对象
+	 */
+	public function __invoke(mixed $value): part{
+		return new part($value, type::VALUE, $this);
 	}
+	/**
+	 * 静态方法调用，创建函数类型的 part 对象
+	 *
+	 * @param string $name      函数名（如 'COUNT', 'SUM'）
+	 * @param array  $arguments 参数列表
+	 * @return part part 对象
+	 */
 	public static function __callStatic($name, $arguments): part{
-		return new part($name, 'function')->arguments(...$arguments);
+		return new part($name, type::FUNCTION)->arguments(...$arguments);
 	}
 	public function offsetSet($offset, $value): void{}
 	public function offsetExists($offset): bool{ return false; }
 	public function offsetUnset($offset): void{}
+	/**
+	 * 实现 ArrayAccess 接口，用于获取字段对应的 part 对象
+	 *
+	 * @param string|part|null $offset 字段名或表达式
+	 * @return part part 对象
+	 */
 	public function offsetGet(mixed $offset): part{
-		return new part($offset, 'field', $this);
+		return new part($offset, type::FIELD, $this);
 	}
+	/**
+	 * 提供调试信息，返回对象内部状态
+	 *
+	 * @return array 包含当前 SQL 构建器的信息
+	 */
 	public function __debugInfo(): array{
 		return [
 			'table' => "$this->table $this->as",

@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace nx\helpers\db\sql;
 
 use nx\helpers\db\sql;
+use nx\helpers\db\sql\part\type;
 
 /**
  * Class part
@@ -10,9 +11,30 @@ use nx\helpers\db\sql;
  * @package nx\helpers\db\sql
  *
  * 12.2
+ * @method static part add(mixed $left, mixed $right)              加法运算符
+ * @method static part sub(mixed $left, mixed $right)              减法运算符
+ * @method static part mul(mixed $left, mixed $right)              乘法运算符
+ * @method static part div(mixed $left, mixed $right)              除法运算符
+ * -method static part mod(mixed $left, mixed $right)              取模运算符
+ * @method static part eq(mixed $left, mixed $right)               等于运算符
+ * @method static part ne(mixed $left, mixed $right)               不等于运算符
+ * @method static part lt(mixed $left, mixed $right)               小于运算符
+ * @method static part le(mixed $left, mixed $right)               小于等于运算符
+ * @method static part gt(mixed $left, mixed $right)               大于运算符
+ * @method static part ge(mixed $left, mixed $right)               大于等于运算符
+ * @method static part nullsafe_eq(mixed $left, mixed $right)      安全空值比较运算符
+ * -method static part and (mixed $left, mixed $right)              逻辑与运算符
+ * -method static part or (mixed $left, mixed $right)               逻辑或运算符
+ * -method static part xor (mixed $left, mixed $right)              逻辑异或运算符
+ * @method static part like(mixed $left, mixed $right)             模糊匹配运算符（LIKE）
+ * @method static part rlike(mixed $left, mixed $right)            正则表达式匹配运算符（REGEXP）
+ * @method static part regexp(mixed $left, mixed $right)           同上
+ * -method static part between(mixed $field, mixed $start, mixed $end) 范围判断运算符（BETWEEN）
+ * -method static part not(mixed $expr)                            非运算符（NOT）
+ * -method static part in(mixed $field, mixed ...$values)         IN 运算符
  * @method static part operate($N2, $operator='=')
  * @method static part equal($N2) =
- * @method static part between($min,$max,$NOT=false) expr BETWEEN min AND max 假如expr大于或等于 min 且expr 小于或等于max, 则BETWEEN 的返回值为1,或是0。若所有参数都是同一类型，则上述关系相当于表达式   (min <= expr AND expr <=
+ * @method static part between($min,$max) expr BETWEEN min AND max 假如expr大于或等于 min 且expr 小于或等于max, 则BETWEEN 的返回值为1,或是0。若所有参数都是同一类型，则上述关系相当于表达式   (min <= expr AND expr <=
  *         max)。其它类型的转换根据本章开篇所述规律进行，且适用于3种参数中任意一种。
  *
  *	AND, &&			Logical AND
@@ -70,7 +92,7 @@ use nx\helpers\db\sql;
  * @method static part GREATEST(...$values) With two or more arguments, returns the largest (maximum-valued) argument. The arguments are compared using the same rules as for LEAST().
  * @method static part in($expr, ...$values) expr IN (value,...) 若expr 为IN列表中的任意一个值，则其返回值为 1 , 否则返回值为0。假如所有的值都是常数，则其计算和分类根据 expr 的类型进行。这时，使用二分搜索来搜索信息。如IN值列表全部由常数组成，则意味着IN 的速度非常之快。如expr
  *         是一个区分大小写的字符串表达式，则字符串比较也按照区分大小写的方式进行
- *?@method static part notIN(...$values) expr NOT IN (value,...)
+ * -method static part notIN(...$values) expr NOT IN (value,...)
  * @method static part ISNULL() If expr is NULL, ISNULL() returns 1, otherwise it returns 0.
  * @method static part INTERVAL(...$values) 假如N < N1，则返回值为0；假如N < N2 等等，则返回值为1；假如N 为NULL，则返回值为 -1 。所有的参数均按照整数处理。为了这个函数的正确运行，必须满足 N1 < N2 < N3 < ……< Nn 。其原因是使用了二分查找(极快速)
  * @method static part LEAST(...$values) 在有两个或多个参数的情况下， 返回值为最小 (最小值) 参数。用一下规则将自变量进行对比
@@ -96,7 +118,7 @@ use nx\helpers\db\sql;
  *	IFNULL()    Null if/else construct
  *	NULLIF()	Return NULL if expr1 = expr2
  * @method static part IF($expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
- * @method static part IFIF($expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
+ * -method static part IFIF($expr2,$expr3) 如果 expr1 是TRUE (expr1 <> 0 and expr1 <> NULL)，则 IF()的返回值为expr2; 否则返回值则为 expr3。IF() 的返回值为数字值或字符串值，具体情况视其所在语境而定
  * @method static part IFNULL($expr2) 假如expr1 不为 NULL，则 IFNULL() 的返回值为 expr1; 否则其返回值为 expr2。IFNULL()的返回值是数字或是字符串，具体情况取决于其所使用的语境
  * @method static part NULLIF($expr2) 如果expr1 = expr2  成立，那么返回值为NULL，否则返回值为 expr1。这和CASE WHEN expr1 = expr2 THEN NULL ELSE expr1 END相同
  *
@@ -458,12 +480,24 @@ use nx\helpers\db\sql;
  *         的值,并不会发生重复键冲突。这个函数在多行插入中特别有用。  VALUES()函数只在INSERT ... UPDATE 语句中有意义，而在其它情况下只会返回 NULL
  */
 class part{
+	/**
+	 * 初始化 part 对象
+	 *
+	 * @param mixed       $value     值（字段名、函数名或具体值）
+	 * @param type        $type      类型
+	 * @param sql|null    $from      来源表对象（仅当 type 为 'field' 时有效）
+	 * @param string|null $as        别名
+	 * @param array       $arguments 函数参数列表（仅当 type 为 'function' 时有效）
+	 * @param sql|null    $collect   参数收集来源表（默认使用 from）
+	 * @param bool        $negate    是否取反（NOT 操作）
+	 */
 	public function __construct(public mixed $value,
 		/**
 		 * 类型
-		 * @var string [value|field|function]
+		 *
+		 * @var type
 		 */
-		public string $type = 'value',
+		public type $type = type::VALUE,
 		/**
 		 * 部分来源 用于类型为field的时候
 		 */
@@ -483,122 +517,180 @@ class part{
 		/**
 		 * 作为参数收集来源记录，默认为from
 		 */
-		protected ?sql $collect = null
+		protected ?sql $collect = null,
+		protected bool $negate =false,
 	){}
+	/**
+	 * 设置参数收集来源表
+	 *
+	 * @param sql $from 来源表对象
+	 * @return part 当前对象用于链式调用
+	 */
 	public function collectFrom(sql $from): static{
 		$this->collect = $from;
 		return $this;
 	}
+	/**
+	 * 设置函数参数列表
+	 *
+	 * @param mixed ...$arguments 函数参数，支持字符串、数字、part 对象等
+	 * @return part 当前对象用于链式调用
+	 */
 	public function arguments(...$arguments): static{
-		$this->arguments = array_map(fn($arg) => $arg instanceof part ? $arg : new static($arg, 'value', $this->from), $arguments);
+		if ($this->type !== type::FUNCTION) throw new \InvalidArgumentException('arguments() can only be called on function type part objects');
+		$this->arguments = array_map(fn($arg) => $arg instanceof part ? $arg : new static($arg, type::VALUE, $this->from), $arguments);
 		return $this;
 	}
+	/**
+	 * 支持动态调用函数方法（如：$part->sum(1, 2)）
+	 *
+	 * @param string $name      方法名（如 'sum', 'count' 等）
+	 * @param array  $arguments 参数列表
+	 * @return part 构造后的 part 对象
+	 */
 	public function __call($name, $arguments): static{
-		return new static($name, 'function', $this->from)->arguments($this, ...$arguments);
+		return new static($name, type::FUNCTION, $this->from)->arguments($this, ...$arguments);
 	}
 	/**
-	 * @param $name
-	 * @param $arguments
-	 * @return part
+	 * 静态方法调用，创建函数类型的 part 对象
+	 * 支持mysql 12章所有方法
+	 *
+	 * @param string $name      函数名（如 'COUNT', 'SUM'）
+	 * @param array  $arguments 参数列表
+	 * @return part 构造后的 part 对象
 	 */
 	public static function __callStatic($name, $arguments): static{
-		return new static($name, 'function')->arguments(...$arguments);
+		return new static($name, type::FUNCTION)->arguments(...$arguments);
 	}
 	/**
 	 * 设置别名
-	 * @param string $name
-	 * @return part
+	 *
+	 * @param string $name 别名名称
+	 * @return part 当前对象用于链式调用
 	 */
 	public function as(string $name): static{
 		$this->as = $name;
 		return $this;
 	}
+	/**
+	 * 取反操作（添加 NOT）
+	 *
+	 * @return part 当前对象用于链式调用
+	 */
+	public function negate(): static{
+		$this->negate =! $this->negate;
+		return $this;
+	}
+	/**
+	 * 转换为字符串形式的 SQL 表达式
+	 *
+	 * @return string 构造完成的 SQL 表达式字符串
+	 */
 	public function __toString():string{
 		$r ='';
 		switch($this->type){
-			case 'value':
+			case type::VALUE:
 				$r =sql::formatValue($this->value, $this->from);
 				break;
-			case 'field':
-				//$table =(string)$this->from;
-				//$r =$table.'.'.\nx\helpers\db\sql::formatField($this->value);
-				$r =$this->from->formatField($this->value);
+			case type::FIELD:
+				if(!$this->from){
+					if($this->value instanceof part) return (string)$this->value;
+					$value = $this->value ?? "id";
+					$r = ('*' === $value) ? $value : "`$value`";
+				} else $r =$this->from->formatField($this->value);
 				break;
-			case 'function':
+			case type::FUNCTION:
 				$fun =$this->value;
-				switch($fun){//自定义函数处理转换
-					case 'and':
-					case 'or':
-					case 'xor':
-						$opt =strtoupper($fun);
-						$r ="({$this->arguments[0]} $opt {$this->arguments[1]})";
-						break;
-					case 'not':
-						$r ="NOT {$this->arguments[1]}";
-						break;
-					case 'equal':
-						$r ="{$this->arguments[0]} = {$this->arguments[1]}";
-						break;
-					case 'operate':
-						$opt =$this->arguments[2] ?? '=';
-						if($opt instanceof part) $opt =$opt->value;
-						$opt =strtoupper($opt);
-						$r ="{$this->arguments[0]} $opt {$this->arguments[1]}";
-						break;
-					case 'between':
-						$opt =$this->arguments[3] ?? false;
-						if($opt instanceof part) $opt =$opt->value;
-						$not =$opt ?'NOT ':'';
-						$r ="{$this->arguments[0]} {$not}BETWEEN {$this->arguments[1]} AND {$this->arguments[2]}";
-						break;
-					case 'in':
-						$in =$this->arguments;
-						array_shift($in);
-						$in =implode(',', $in);
-						$r ="{$this->arguments[0]} IN ($in)";
-						break;
-					case 'notIn':
-						$in =$this->arguments;
-						array_shift($in);
-						$in =implode(',', $in);
-						$r ="{$this->arguments[0]} NOT IN ($in)";
-						break;
-					case 'TRIM':
-						$side =strtoupper(($this->arguments[2] ??null) ?$this->arguments[2]->value :'both');
-						$rem =($this->arguments[1] ?? null) ?"{$this->arguments[1]} " :'';
-						$r ="TRIM($side {$rem}FROM {$this->arguments[0]})";
-						break;
-					case 'WEIGHT_STRING':
-						$type =strtoupper(($this->arguments[2] ??null) ?$this->arguments[2]->value :'char');
-						$n =($this->arguments[1] ?? null) ?($this->arguments[1]->value ?? null) ?$this->arguments[1] :'' :'';
-						$r ="WEIGHT_STRING({$this->arguments[0]} AS $type($n))";
-						break;
-					case "AVG":
-					case "COUNT":
-					case "MIN":
-					case "MAX":
-					case "SUM":
-						$fun =strtoupper($fun);
-						$distinct =(!empty($this->arguments[1]) && $this->arguments[1]->value) ?'DISTINCT ':'';
-						$r ="$fun($distinct{$this->arguments[0]})";
-						break;
-					case "IFIF":
-						$fun ="IF";
-					default:
-						$fun =strtoupper($fun);
-						$args =implode(', ',$this->arguments);
-						$r ="$fun($args)";
-						break;
+				if (str_starts_with($fun, 'not_')) {
+					$fun = substr($fun, 4); // 移除 'not_' 前缀
+					$this->negate =! $this->negate;
 				}
-
+				$map =[
+					'add'=>'+','sub'=>'-','mul'=>'*', 'div'=>'/', 'mod'=>'%',
+					'eq' =>'=', 'ne'=>'!=', 'lt'=>'<', 'le'=>'<=', 'gt'=>'>','ge'=>'>=','nullsafe_eq'=>'<=>',
+					'equal'=>'=',
+					'and'=>'AND','or'=>'OR','xor'=>'XOR',
+					'like'=>'LIKE', 'rlike'=>'REGEXP', 'regexp'=>'REGEXP',
+					'between'=>'BETWEEN',
+				];
+				$r =match($fun){
+					'add','sub','mul','div','mod',
+					'eq', 'ne', 'lt', 'gt', 'le', 'ge', 'nullsafe_eq','equal'=>"{$this->arguments[0]} $map[$fun] {$this->arguments[1]}",
+					//'and', 'or', 'xor'=>"{$this->arguments[0]} $map[$fun] {$this->arguments[1]}",
+					'and', 'or', 'xor'=>"({$this->arguments[0]} $map[$fun] {$this->arguments[1]})",
+					'like', 'rlike', 'regexp'=>"{$this->arguments[0]} ".($this->negate ?"NOT ":"").$map[$fun]." {$this->arguments[1]}",
+					'not' =>"NOT {$this->arguments[1]}",
+					'between'=>"{$this->arguments[0]} ".($this->negate ?"NOT ":"").$map[$fun]." {$this->arguments[1]} AND {$this->arguments[2]}",
+					default =>null,
+				};
+				if(null===$r){
+					switch($fun){//自定义函数处理转换
+						case 'operate':
+							$opt = $this->arguments[2] ?? '=';
+							if($opt instanceof part) $opt = $opt->value;
+							$opt = strtoupper($opt);
+							$r = "{$this->arguments[0]} $opt {$this->arguments[1]}";
+							break;
+						case 'in':
+							$in = $this->arguments;
+							array_shift($in);
+							$in = implode(',', $in);
+							$not =$this->negate ?"NOT ":"";
+							$r = "{$this->arguments[0]} {$not}IN ($in)";
+							break;
+						//case 'notIn':
+						//	$in = $this->arguments;
+						//	array_shift($in);
+						//	$in = implode(',', $in);
+						//	$not =$this->negate ?"":"NOT ";
+						//	$r = "{$this->arguments[0]} {$not}IN ($in)";
+						//	break;
+						case 'TRIM':
+							$side = strtoupper(($this->arguments[2] ?? null) ? $this->arguments[2]->value : 'both');
+							$rem = ($this->arguments[1] ?? null) ? "{$this->arguments[1]} " : '';
+							$r = "TRIM($side {$rem}FROM {$this->arguments[0]})";
+							break;
+						case 'WEIGHT_STRING':
+							$type = strtoupper(($this->arguments[2] ?? null) ? $this->arguments[2]->value : 'char');
+							$n = ($this->arguments[1] ?? null) ? ($this->arguments[1]->value ?? null) ? $this->arguments[1] : '' : '';
+							$r = "WEIGHT_STRING({$this->arguments[0]} AS $type($n))";
+							break;
+						case "AVG":
+						case "COUNT":
+						case "MIN":
+						case "MAX":
+						case "SUM":
+							$fun = strtoupper($fun);
+							$distinct = (!empty($this->arguments[1]) && $this->arguments[1]->value) ? 'DISTINCT ' : '';
+							$r = "$fun($distinct{$this->arguments[0]})";
+							break;
+						//case "IFIF":
+						//	$fun = "IF";
+						default:
+							$fun = strtoupper($fun);
+							$args = implode(', ', $this->arguments);
+							$r = "$fun($args)";
+							break;
+					}
+				}
+				if($this->negate && !in_array($fun, ['in','notIn', 'between', 'like', 'rlike','regexp'])){
+					return "NOT ($r)".($this->as ?" `$this->as`":'');
+				}
 		}
 		return $r.($this->as ?" `$this->as`":'');
 	}
+	/**
+	 * 提供调试信息，返回对象内部状态
+	 *
+	 * @return array 包含当前 part 对象的信息
+	 */
 	public function __debugInfo(): array{
 		return [
-			'type' => $this->type,
+			'type' => $this->type->value,
 			'value' => $this->value,
-			'from' => '#'.spl_object_id($this->from),
+			'from' => $this->from ? '#'.spl_object_id($this->from) :null,
+			'not'=>$this->negate,
+			'as'=>$this->as,
 			'arguments' => $this->arguments,
 		];
 	}

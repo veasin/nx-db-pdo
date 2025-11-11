@@ -40,28 +40,31 @@ class result{
 	 * DATA:[[key, val, oth],[key, val, oth]...]
 	 * ARGS:(key, val)=>[key=>val],
 	 *      (key, fun)=>[key=>fun(val)]
-	 *      (key,false)=>[key=>[key, val, oth]],
+	 *      (key, null)=>[key=>[key, val, oth]],
 	 *      (null, val)=>[val, val],
 	 *      (null, fun)=>[fun(val)]
-	 *      (null, false) =>$array
-	 * @param int|string|null $key
-	 * @param mixed             $value
+	 *      (null, null) =>$array
+	 *
+	 * @param int|string|null          $key
+	 * @param int|string|null|callable $value
 	 * @return array
 	 */
-	public function map(int|string|null $key=0, mixed $value=1):array{
-		return $this->fetchAllMap(
-			fn(array $data) => array_reduce($data, function($carry, $item) use ($key, $value) {
-				$k = $key !== null ? $item[$key] : null;
-				$v = match(true) {
-					$value === false => $item,
-					is_callable($value) => $value($item),
-					default => $item[$value]
-				};
-				$key === null ? $carry[] = $v : $carry[$k] = $v;
-				return $carry;
-			}, []),
-			\PDO::FETCH_ASSOC
-		) ?? [];
+	public function map(int|string|null $key = null, int|string|null|callable $value = null): array{
+		if(!$this->result) return [];
+		$data = $this->fetchAll(\PDO::FETCH_ASSOC);
+		if(empty($data)) return [];
+		if(null === $key && null === $value) return $data;
+		$result = [];
+		foreach($data as $item){
+			$k = $key !== null ? $item[$key] ?? null : null;
+			$v = match (true) {
+				null === $value => $item,
+				is_callable($value) => $value($item),
+				default => $item[$value] ?? null,
+			};
+			$key === null ? $result[] = $v : $result[$k] = $v;
+		}
+		return $result;
 	}
 	/**
 	 * 获取全部查询结果 后，再对全部数据进行一次回调

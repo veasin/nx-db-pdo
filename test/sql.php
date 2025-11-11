@@ -133,7 +133,7 @@ test::case('where in', (string)$user)
 	->and($user->params)
 	->toBe([1, 2, 3]);
 
-$user->where(['id' => [1, 2, 3, 'fn'=>'notIn']])->select();
+$user->where(['id' => [1, 2, 3, 'fn'=>'not_in']])->select();
 test::case('where not in', (string)$user)
 	->toBe('SELECT * FROM `user` WHERE `id` NOT IN (?,?,?)')
 	->and($user->params)
