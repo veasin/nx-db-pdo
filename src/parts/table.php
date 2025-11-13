@@ -15,9 +15,9 @@ trait table{
 	 * @param string|null $tableName
 	 * @param string|null $primary
 	 * @param string|null $config
-	 * @return sql
+	 * @return \nx\helpers\db\sql\table
 	 */
-	protected function table(?string $tableName=null, ?string $primary=null, ?string $config=null):sql{
-		return $this->db($config ?? $this->dbConfig)->from($tableName ?? $this->tableName, $primary ?? $this->tablePrimary ?? 'id');
+	protected function table(?string $tableName=null, ?string $primary=null, ?string $config=null):sql\table{
+		return $this->db($config ?? $this->dbConfig)->table($tableName ?? $this->tableName, $primary ?? $this->tablePrimary ?? 'id');
 	}
 }

@@ -26,5 +26,5 @@ class app extends nx\app{
 ```php
 $this->db()->execute("SELECT * FROM `user`");
 $this->table("user")->select()->execute();
-//$this->db()->from("user");
+//$this->db()->table("user");
 ```

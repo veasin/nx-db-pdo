@@ -14,8 +14,8 @@ trait pdo{
 		$cache_name = "db/pdo/$name";
 		if(!isset($this[$cache_name])){
 			$pdo =new nxPDO(($this['db/pdo'] ?? [])[$name] ?? throw new Error("db[$name] config error."));
-			if(method_exists($this,'runtime')) $pdo->setLog([$this, 'runtime']);
-			elseif (method_exists($this, 'log')) $pdo->setLog([$this, 'log']);
+			//if(method_exists($this,'runtime')) $pdo->setLog([$this, 'runtime']);
+			//elseif (method_exists($this, 'log')) $pdo->setLog([$this, 'log']);
 			$this[$cache_name]=$pdo;
 		}
 		return $this[$cache_name];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace nx\helpers\db;
 
 use nx\helpers\db\pdo\result;
+use nx\helpers\db\sql\table;
 
 class pdo{
 	private array $_nx_db_pdo_options = [
@@ -97,5 +98,9 @@ class pdo{
 			return null;
 		}
 	}
-	public function from(string $tableName, string $primary = 'id'): sql{ return new sql($tableName, $primary, $this); }
+	public function table(string $name, string $primary = 'id'): table{ return sql::table($name, $primary, $this); }
+	/**
+	 * @deprecated 2025/11/13
+	 */
+	public function from(string $name, string $primary = 'id'): table{ return sql::table($name, $primary, $this); }
 }
