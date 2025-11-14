@@ -15,13 +15,11 @@ class value extends expr{
 			}
 			return sql::$current->collectParam($this->value);
 		}
-		$v = match (true) {
-			is_string($this->value) => "\"$this->value\"",
-			is_bool($this->value) => $this->value ? 'TRUE' : 'FALSE',
-			is_null($this->value) => 'NULL',
-			is_array($this->value) => join(',', $this->value),
-			default => (string)$this->value,
-		};
-		return $this->alias ? "$v `$this->alias`" : $v;
+		return builder::value($this->value, $this->alias, sql::$current?->dialect);
+	}
+	public function __debugInfo(): ?array{
+		$i =['value'=>$this->value];
+		$this->alias && $i['alias'] = $this->alias;
+		return $i;
 	}
 }

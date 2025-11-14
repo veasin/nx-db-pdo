@@ -19,26 +19,26 @@ use nx\helpers\db\sql;
  * @method sql having(mixed ...$conditions)
  */
 class table implements \ArrayAccess{
-	protected(set) ?string $alias=null;
+	use alias;
+
 	public function __construct(protected(set) string $name, protected(set) string $primary = 'id', protected(set) ?pdo $db = null){
-		[$this->name, $this->alias] =explode(' ', $name, 2) + ['', null];
-	}
-	public function as(string $alias): static{
-		$clone = clone $this;
-		$clone->alias = $alias;
-		return $clone;
+		[$this->name, $this->alias] = explode(' ', $name, 2) + ['', null];
 	}
 	public function __call($name, $arguments): sql{
 		return new sql($this)->$name(...$arguments);
 	}
 	public function __toString(): string{
-		return sql::$current?->hasJoin() ? "`$this->name`" . ($this->alias ?" `$this->alias`": '') : "`$this->name`";
+		return builder::table($this->name, sql::$current?->hasJoin() ? $this->alias : null, sql::$current?->dialect);
 	}
 	public function offsetGet(mixed $offset): field{
-		if(null===$offset) $offset =$this->primary;
+		if(null === $offset) $offset = $this->primary;
 		return new field($offset, $this);
 	}
 	public function offsetSet($offset, $value): void{}
 	public function offsetExists($offset): bool{ return false; }
 	public function offsetUnset($offset): void{}
+	public function __debugInfo(): ?array{
+		$f =$this->name.($this->alias ?"($this->alias)" : '')."[$this->primary]";
+		return ['table' => $f];
+	}
 }

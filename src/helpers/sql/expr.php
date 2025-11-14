@@ -1,16 +1,12 @@
 <?php
 declare(strict_types=1);
 namespace nx\helpers\db\sql;
-
 /**
- * Class part
- * @package nx\helpers\db\sql
- * 12.2
  * @method operate add(mixed $any)              加法运算符
  * @method operate sub(mixed $any)              减法运算符
  * @method operate mul(mixed $any)              乘法运算符
  * @method operate div(mixed $any)              除法运算符
- * -method static part mod(mixed $any)              取模运算符
+ * @method operate mod(mixed $any)              取模运算符
  * @method operate eq(mixed $any)               等于运算符
  * @method operate ne(mixed $any)               不等于运算符
  * @method operate lt(mixed $any)               小于运算符
@@ -18,26 +14,19 @@ namespace nx\helpers\db\sql;
  * @method operate gt(mixed $any)               大于运算符
  * @method operate ge(mixed $any)               大于等于运算符
  * @method operate nullsafe_eq(mixed $any)      安全空值比较运算符
- * -method static part and (mixed $any)              逻辑与运算符
- * -method static part or (mixed $any)               逻辑或运算符
- * -method static part xor (mixed $any)              逻辑异或运算符
  * @method operate like(string $str)             模糊匹配运算符（LIKE）
  * @method operate rlike(string $str)            正则表达式匹配运算符（REGEXP）
  * @method operate regexp(string $str)           同上
- * -method static part between(mixed $field, mixed $start, mixed $end) 范围判断运算符（BETWEEN）
- * -method static part not(mixed $expr)                            非运算符（NOT）
- * -method static part in(mixed $field, mixed ...$values)         IN 运算符
- * @method operate operate($N2, $operator='=')
+ * @method operate operate($N2, $operator = '=')
  * @method operate equal($N2) =
- * @method operate between($min,$max) expr BETWEEN min AND max 假如expr大于或等于 min 且expr 小于或等于max, 则BETWEEN 的返回值为1,或是0。若所有参数都是同一类型，则上述关系相当于表达式   (min <= expr AND expr <=
- *         max)。其它类型的转换根据本章开篇所述规律进行，且适用于3种参数中任意一种。
- * @method operate in($expr, ...$values) expr IN (value,...) 若expr 为IN列表中的任意一个值，则其返回值为 1 , 否则返回值为0。假如所有的值都是常数，则其计算和分类根据 expr 的类型进行。这时，使用二分搜索来搜索信息。如IN值列表全部由常数组成，则意味着IN 的速度非常之快。如expr
- *         是一个区分大小写的字符串表达式，则字符串比较也按照区分大小写的方式进行
- * -method static part notIN(...$values) expr NOT IN (value,...)
+ * @method operate not_between($min, $max) expr NOT BETWEEN min AND max
+ * @method operate between($min, $max) expr BETWEEN min AND max 假如expr大于或等于 min 且expr 小于或等于max, 则BETWEEN 的返回值为1, 或是0
+ * @method operate not_in($expr, ...$values) expr NOT IN (value, ...)
+ * @method operate in($expr, ...$values) expr IN (value, ...) 若expr 为IN列表中的任意一个值，则其返回值为 1, 否则返回值为0
  * @method operate not() NOT ! 逻辑 NOT。当操作数为0 时，所得值为 1 ；当操作数为非零值时，所得值为  0 ，而当操作数为NOT NULL时，所得的返回值为 NULL
- * @method operate and($expr2) AND && 逻辑AND。当所有操作数均为非零值、并且不为NULL时，计算所得结果为  1 ，当一个或多个操作数为0 时，所得结果为 0 ，其余情况返回值为 NULL
- * @method operate or($expr2) OR || 逻辑 OR。当两个操作数均为非 NULL值时，如有任意一个操作数为非零值，则结果为1，否则结果为0。当有一个操作数为NULL时，如另一个操作数为非零值，则结果为1，否则结果为 NULL 。假如两个操作数均为  NULL，则所得结果为 NULL
- * @method operate xor($expr2) XOR 逻辑XOR。当任意一个操作数为 NULL时，返回值为NULL。对于非   NULL 的操作数，假如一个奇数操作数为非零值，则计算所得结果为  1 ，否则为  0
+ * @method operate and ($expr2) AND && 逻辑AND。当所有操作数均为非零值、并且不为NULL时，计算所得结果为  1 ，当一个或多个操作数为0 时，所得结果为 0 ，其余情况返回值为 NULL
+ * @method operate or ($expr2) OR || 逻辑 OR。当两个操作数均为非 NULL值时，如有任意一个操作数为非零值，则结果为1，否则结果为0。当有一个操作数为NULL时，如另一个操作数为非零值，则结果为1，否则结果为 NULL 。假如两个操作数均为  NULL，则所得结果为 NULL
+ * @method operate xor ($expr2) XOR 逻辑XOR。当任意一个操作数为 NULL时，返回值为NULL。对于非   NULL 的操作数，假如一个奇数操作数为非零值，则计算所得结果为  1 ，否则为  0
  * @method operate ABS() - ABS(expr) 返回绝对值
  * @method operate ACOS() - ACOS(expr) 返回反余弦值
  * @method operate ADDDATE(string $interval) - ADDDATE(date, interval) 将时间间隔加到日期上
@@ -182,7 +171,7 @@ namespace nx\helpers\db\sql;
  * @method operate MID(int $start, int $len) - MID(str, start, len) 返回从指定位置开始的子串
  * @method operate MIN() - MIN(expr) 返回最小值
  * @method operate MINUTE() - MINUTE(time) 返回分钟
- * @method operate MOD(int $expr2) - MOD(expr1, expr2) 返回余数
+ * -method operate MOD(int $expr2) - MOD(expr1, expr2) 返回余数
  * @method operate MONTH() - MONTH(date) 返回月份
  * @method operate MONTHNAME() - MONTHNAME(date) 返回月份名称
  * @method operate NAME_CONST(mixed $value) - NAME_CONST(col_name, value) 为列指定名称
@@ -267,15 +256,10 @@ namespace nx\helpers\db\sql;
  * @method operate YEARWEEK() - YEARWEEK(date) 返回年和周数
  */
 abstract class expr{
-	protected(set) ?string $alias = null;
-	public function as(string $alias): static{
-		$clone = clone $this;
-		$clone->alias = $alias;
-		return $clone;
-	}
+	use alias;
+
 	public function __call($name, $arguments): operate{
 		return new operate($name, [$this, ...$arguments]);
 	}
 	abstract public function __toString(): string;
 }
-

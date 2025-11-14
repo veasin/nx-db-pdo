@@ -9,7 +9,7 @@ error_reporting(E_ALL);
 $user = sql::table('user');
 $info = sql::table('info i');
 $sql =$user->join($info, ['id' => $user['id']]);
-$sql->where($info['id']->equal(1));
+$sql->where($info['id']->eq(1));
 $sql->select();
 
 test::case('join on', (string)$sql)
@@ -20,7 +20,7 @@ test::case('join on', (string)$sql)
 $user = sql::table('user');
 $info = sql::table('info a');
 $sql =$user->join($info->select(), ['user_id' => 'id'])->where([
-	$user['id']->equal(1),
+	$user['id']->eq(1),
 	$info['id']->operate(2, '>'),
 ])->select(null);
 

@@ -76,13 +76,13 @@ $sql =$user->insert(['id' => 1, 'name' => 'vea'], $options = []);
 test::case('insert 1', (string)$sql)
 	->toBe('INSERT INTO `user` (`id`, `name`) VALUES (?, ?)')
 	->and($sql->params)
-	->toBe([[1, 'vea']]);
+	->toBe([1, 'vea']);
 
 $sql =$info->insert([['id' => 1, 'name' => 'vea'], ['id' => 2, 'name' => 'f0']]);
 test::case('insert more', (string)$sql)
-	->toBe('INSERT INTO `info` (`id`, `name`) VALUES (?, ?)')
+	->toBe('INSERT INTO `info` (`id`, `name`) VALUES (?, ?), (?, ?)')
 	->and($sql->params)
-	->toBe([[1, 'vea'], [2, 'f0']]);
+	->toBe([1, 'vea', 2, 'f0']);
 
 //where
 $user =sql::table('user');
@@ -131,13 +131,13 @@ test::case('where in', (string)$sql)
 
 $sql->where(['id' => [1, 2, 3, 'fn'=>'in']])->select();
 test::case('where in', (string)$sql)
-	->toBe('SELECT * FROM `user` WHERE `id` IN (?,?,?)')
+	->toBe('SELECT * FROM `user` WHERE `id` IN (?, ?, ?)')
 	->and($sql->params)
 	->toBe([1, 2, 3]);
 
 $sql->where(['id' => [1, 2, 3, 'fn'=>'not_in']])->select();
 test::case('where not in', (string)$sql)
-	->toBe('SELECT * FROM `user` WHERE `id` NOT IN (?,?,?)')
+	->toBe('SELECT * FROM `user` WHERE `id` NOT IN (?, ?, ?)')
 	->and($sql->params)
 	->toBe([1, 2, 3]);
 
