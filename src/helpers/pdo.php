@@ -14,10 +14,10 @@ class pdo{
 		\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
 	];
 	private ?\PDO $link = null;
-	private $logging;
+	private $logging=null;
 	public function __construct(private array $setup = []){
 		$this->setup['options'] = ($this->setup['options'] ?? []) + $this->_nx_db_pdo_options;
-		$this->logging = !!\nx\app::$instance;
+		if(\nx\app::$instance) $this->logging =method_exists(\nx\app::$instance, 'runtime') ?\nx\app::$instance->runtime(...) :\nx\app::$instance->log(...);
 	}
 	private function isConnected(): bool{
 		if(!$this->link) return false;
@@ -36,8 +36,8 @@ class pdo{
 	}
 	private function log(string $template, array $data = []): void{
 		if(!$this->logging) return;
-		\nx\app::$instance->log($template, 'sql');
-		$data && \nx\app::$instance->log($data, 'data');
+		($this->logging)($template, 'sql');
+		$data && ($this->logging)($data, 'data');
 	}
 	private function logFormatSQL(string $prepare, ?array $params = null, string $action = ''): void{
 		if(!$this->logging) return;
